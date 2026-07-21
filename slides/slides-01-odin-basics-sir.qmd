@@ -17,7 +17,7 @@ Coding compartmental models with R and odin
 
 Swapnil Mishra (Asst. Professor)
 
-![](../logos/sshsph.png){height="55px"} ![](../logos/cerm.png){height="55px"} ![](../logos/mlghn.png){height="55px"}
+![](../logos/sshsph.png){height="42px"} ![](../logos/cerm.png){height="30px"} ![](../logos/mlghn.png){height="30px"}
 
 [Session book: notes, exercises and solutions](../index.html){style="font-size: 0.55em;"}
 

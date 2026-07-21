@@ -69,4 +69,4 @@ carry over directly; the main syntax differences are that odin2 uses
 
 *Instructor: Swapnil Mishra (Asst. Professor)*
 
-![](logos/sshsph.png){height="70px"} ![](logos/cerm.png){height="70px"} ![](logos/mlghn.png){height="70px"}
+![](logos/sshsph.png){height="85px"} ![](logos/cerm.png){height="65px"} ![](logos/mlghn.png){height="65px"}
