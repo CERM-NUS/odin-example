@@ -1,10 +1,5 @@
 # B3_1: odin basics & the SIR model {#sec-lecture1}
 
-**Duration:** ~50 minutes
-**Plan:** why odin & the SIR equations (10 min) · first model & compilation
-(15) · running & plotting (5) · `user()` & scenarios (10) · cumulative
-incidence (5) · exercises (5)
-
 **Goal:** write, compile, run and plot your first compartmental model in odin.
 
 ## Why odin?

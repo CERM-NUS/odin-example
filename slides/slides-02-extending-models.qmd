@@ -170,18 +170,80 @@ Instead of dying out after one wave, incidence oscillates with shrinking
 amplitude and settles to an endemic equilibrium — newborn susceptibles keep
 transmission going.
 
-## Time-varying parameters with `interpolate` {.scrollable}
+## Time-varying parameters
 
-Parameters do not have to be constant — transmission often varies over the
-year, for example. odin can drive a parameter from a user-supplied time
-series with `interpolate()`.
+So far every parameter has been fixed for the whole run. Real drivers change
+over time:
 
-In the closed models so far, a single wave infects most of the population
-and then transmission is over — there is nothing left for seasonality to
-act on. To see recurrent seasonal waves we let immunity wane: recovered
-people return to the susceptible compartment at rate $\omega$ (mean
-immunity duration $1/\omega$, here 90 days). This is the SIRS model, with
-a seasonal `beta`:
+- transmission rises in winter and falls in summer
+- it can shift abruptly when behaviour changes
+
+The solver needs parameter values at arbitrary times — not just at the
+times you have data for — so odin takes a time series of values from you
+and builds a continuous function from it with `interpolate()`.
+
+Two examples first, then the machinery.
+
+## A shift in regime: `constant` {.scrollable}
+
+Transmission changes from one level to another at a known time and stays
+there — two regimes. With `"constant"` interpolation, `beta` holds each
+knot's value until the next knot: exactly a step.
+
+```{r}
+sir_step <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I
+  beta <- interpolate(tt, bb, "constant")
+  tt[] <- user()   # regime change times
+  bb[] <- user()   # beta in each regime
+  dim(tt) <- user()
+  dim(bb) <- user()
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  N0    <- user(1000)
+  I0    <- user(1)
+  gamma <- user(0.1)
+})
+```
+
+## A shift in regime: forcing
+
+```{r}
+#| fig-height: 3.8
+## two regimes: beta halves at day 40
+tt <- c(0, 40, 150)
+bb <- c(2e-4, 1e-4, 1e-4)
+plot(tt, bb, type = "s", lwd = 2, xlab = "Time (days)",
+     ylab = expression(beta), xlim = range(t))
+```
+
+Always plot what you are feeding in, before running.
+
+## A shift in regime: epidemic curve
+
+```{r}
+#| fig-height: 4.2
+y_step   <- sir_step$new(tt = tt, bb = bb)$run(t)
+y_nostep <- sir_generator$new()$run(t)   # baseline: constant beta
+plot(t, y_nostep[, "I"], type = "l", lwd = 2, col = "grey60",
+     xlab = "Time (days)", ylab = "Infectious (I)")
+lines(t, y_step[, "I"], lwd = 2, col = "firebrick")
+abline(v = 40, lty = 2)
+legend("topright", legend = c("constant beta", "beta halves at day 40"),
+       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+```
+
+One compiled model; the time series is just another parameter at `$new()`.
+
+## Seasonal forcing: `"linear"` {.scrollable}
+
+A step is the wrong shape for smooth drivers like seasonality. And a
+practical point: in the closed models so far, one wave ends transmission —
+nothing left for seasonality to act on. So we let immunity wane (SIRS:
+recovered return to $S$ at rate $\omega$, mean immunity 90 days):
 
 ```{r}
 sirs_seasonal <- odin::odin({
@@ -256,22 +318,22 @@ track the forcing, each peaking shortly after `beta` peaks.
 ## The three interpolation types
 
 ```{r}
-#| fig-height: 4.2
+#| fig-height: 4.8
 tt_yr <- seq(0, 365, by = 365 / 12)
 bb_yr <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt_yr / 365))
 grid  <- seq(0, 365, by = 1)
-plot(grid, spline(tt_yr, bb_yr, xout = grid)$y, type = "l", lwd = 2,
-     col = "steelblue", xlab = "Time (days)", ylab = expression(beta))
+plot(grid, spline(tt_yr, bb_yr, xout = grid)$y, type = "l", lwd = 2.5,
+     col = "#08519c", xlab = "Time (days)", ylab = expression(beta))
 lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "linear")$y,
-      lwd = 2, col = "firebrick")
+      lwd = 2.5, col = "#d7301f", lty = 2)
 lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "constant")$y,
-      lwd = 2, col = "darkgreen", lty = 2)
-points(tt_yr, bb_yr, pch = 16)
+      lwd = 2, col = "grey30")
+points(tt_yr, bb_yr, pch = 16, cex = 1.2)
 legend("bottomleft",
-       legend = c("spline (smooth)", "linear (straight segments)",
-                  "constant (steps)", "knots"),
-       col = c("steelblue", "firebrick", "darkgreen", "black"),
-       lwd = c(2, 2, 2, NA), lty = c(1, 1, 2, NA),
+       legend = c("spline (smooth, solid navy)", "linear (dashed red)",
+                  "constant (steps, grey)", "knots"),
+       col = c("#08519c", "#d7301f", "grey30", "black"),
+       lwd = c(2.5, 2.5, 2, NA), lty = c(1, 2, 1, NA),
        pch = c(NA, NA, NA, 16), bty = "n", cex = 0.8)
 ```
 

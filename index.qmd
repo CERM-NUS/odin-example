@@ -15,12 +15,12 @@ By the end of the session you will be able to:
 - Extend a model with a latent period (SEIR), births and deaths, and
   time-varying parameters
 
-## Timetable (90 minutes)
+## Session plan
 
-| Time | Topic | Material |
-|------|-------|----------|
-| 0:00–0:50 | B3_1: odin basics & the SIR model | @sec-lecture1 |
-| 0:50–1:30 | B3_2: extending models — SEIR, demography, time-varying parameters | @sec-lecture2 |
+| Topic | Material |
+|-------|----------|
+| B3_1: odin basics & the SIR model | @sec-lecture1 |
+| B3_2: extending models — SEIR, demography, time-varying parameters | @sec-lecture2 |
 
 Slide decks for presenting:
 [B3_1 slides](slides/slides-01-odin-basics-sir.html) ·
