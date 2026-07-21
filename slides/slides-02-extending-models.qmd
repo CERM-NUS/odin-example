@@ -327,7 +327,7 @@ track the forcing, each peaking shortly after `beta` peaks.
 
 ::: columns
 
-::: {.column width="42%" style="font-size: 0.62em;"}
+::: {.column style="width:42%; font-size: 0.62em;"}
 ```{r}
 #| fig-show: hide
 tt_yr <- seq(0, 365, by = 365 / 12)
