@@ -326,13 +326,16 @@ track the forcing, each peaking shortly after `beta` peaks.
 ## The three interpolation types
 
 ```{r}
-#| fig-width: 9
-#| fig-height: 5
-#| out-width: 90%
 tt_yr <- seq(0, 365, by = 365 / 4)   # quarterly knots — wider apart on purpose
 bb_yr <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt_yr / 365))
 grid  <- seq(0, 365, by = 1)
+```
 
+```{r}
+#| echo: false
+#| fig-width: 9
+#| fig-height: 5.5
+#| out-width: 95%
 par(mar = c(4.5, 5, 2.5, 1) + 0.1)
 plot(grid, spline(tt_yr, bb_yr, xout = grid)$y, type = "l", lwd = 3,
      col = "#08519c", xlab = "Time (days)", ylab = expression(beta),
