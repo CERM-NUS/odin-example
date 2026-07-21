@@ -1,0 +1,283 @@
+---
+title: "B3_2: Extending models — SEIR, demography & time-varying parameters"
+subtitle: "Coding compartmental models with R and odin"
+author: "Swapnil Mishra (Asst. Professor)"
+format:
+  revealjs:
+    theme: default
+    smaller: true
+    embed-resources: true
+echo: true
+---
+
+::: {layout="[[1,1,1]]" layout-valign="center"}
+![](../logos/sshsph.png){height="60px"}
+![](../logos/cerm.png){height="60px"}
+![](../logos/mlghn.png){height="60px"}
+:::
+
+[Session book: notes, exercises and solutions](../index.html){style="font-size: 0.55em;"}
+
+```{r}
+#| include: false
+library(odin)
+t <- seq(0, 150, by = 1)
+```
+
+## Recap of lecture 1
+
+- odin models are equations, not code — compiled to C once, then fast to
+  run
+- `odin::odin({...})` returns a generator; `generator$new(pars...)`
+  creates an instance; `$run(t)` integrates it
+- Scenarios are repeated `$new()` calls with different parameters
+- Add a `deriv()` line for derived quantities (e.g. cumulative incidence)
+
+Today: grow the SIR skeleton — latent periods, population dynamics and
+parameters that change over time.
+
+## Adding a latent period: SEIR
+
+For many infections people are exposed but not yet infectious — a latent
+period. Add an Exposed compartment $E$; exposed people become infectious
+at rate $\sigma$ (so $1/\sigma$ is the mean latent period):
+
+$$
+\frac{dS}{dt} = -\beta SI, \quad
+\frac{dE}{dt} = \beta SI - \sigma E, \quad
+\frac{dI}{dt} = \sigma E - \gamma I, \quad
+\frac{dR}{dt} = \gamma I
+$$
+
+## SEIR in odin
+
+In odin this means one more compartment and re-routing the flows:
+
+```{r}
+seir_generator <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(E) <- beta * S * I - sigma * E
+  deriv(I) <- sigma * E - gamma * I
+  deriv(R) <- gamma * I
+  initial(S) <- N0 - I0
+  initial(E) <- 0
+  initial(I) <- I0
+  initial(R) <- 0
+  N0    <- user(1000)
+  I0    <- user(1)
+  beta  <- user(2e-4)  # R0 = beta * N / gamma = 2
+  gamma <- user(0.1)   # infectious period 10 days
+  sigma <- user(0.25)  # latent period 4 days
+})
+```
+
+## SEIR dynamics
+
+```{r}
+#| fig-height: 4.5
+y_seir <- seir_generator$new()$run(t)
+matplot(y_seir[, "t"], y_seir[, c("S", "E", "I", "R")],
+        type = "l", lty = 1, lwd = 2,
+        col = c("steelblue", "orange", "firebrick", "darkgreen"),
+        xlab = "Time (days)", ylab = "Number of people")
+legend("right", legend = c("S", "E", "I", "R"), lwd = 2, bty = "n",
+       col = c("steelblue", "orange", "firebrick", "darkgreen"))
+```
+
+## SEIR vs SIR
+
+Compared with the SIR from lecture 1, the same $R_0 = \beta N / \gamma$ now
+gives a later, broader peak — the latent period slows the epidemic down even
+though it does not change $R_0$. Rather than take that on trust, plot both:
+
+```{r}
+#| fig-height: 4
+sir_generator <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  N0    <- user(1000)
+  I0    <- user(1)
+  beta  <- user(2e-4)
+  gamma <- user(0.1)
+})
+y_sir <- sir_generator$new()$run(t)
+plot(t, y_sir[, "I"], type = "l", lwd = 2, col = "grey60",
+     xlab = "Time (days)", ylab = "Infectious (I)")
+lines(t, y_seir[, "I"], lwd = 2, col = "firebrick")
+legend("topright", legend = c("SIR", "SEIR (4-day latent period)"),
+       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+```
+
+Same total transmission, spread over a longer time: later, lower peak.
+
+## Births and deaths: demography
+
+So far the epidemic is a one-off: everyone ends up in $R$ and nothing else
+happens.
+
+Over longer horizons, births replenish the susceptible pool. Add a
+per-capita birth/death rate $\mu$:
+
+- births enter $S$
+- deaths leave every compartment at rate $\mu$
+- $N$ stays constant
+- we now need $N = S + E + I + R$ explicitly for the birth term
+
+We use fast turnover (mean 2 years in the population — think nursery or
+boarding school) so the long-term behaviour shows on a short horizon.
+
+## Demography in odin
+
+```{r}
+seir_demo <- odin::odin({
+  deriv(S) <- mu * N - beta * S * I - mu * S
+  deriv(E) <- beta * S * I - sigma * E - mu * E
+  deriv(I) <- sigma * E - gamma * I - mu * I
+  deriv(R) <- gamma * I - mu * R
+  N <- S + E + I + R
+  initial(S) <- N0 - I0
+  initial(E) <- 0
+  initial(I) <- I0
+  initial(R) <- 0
+  N0    <- user(1000)
+  I0    <- user(1)
+  beta  <- user(2e-4)
+  gamma <- user(0.1)
+  sigma <- user(0.25)
+  mu    <- user(1 / (2 * 365))  # mean 2 years in the population
+})
+```
+
+## Endemic equilibrium
+
+```{r}
+#| fig-height: 4.5
+t_long <- seq(0, 365 * 20, by = 7)   # 20 years, weekly output
+y_demo <- seir_demo$new()$run(t_long)
+plot(y_demo[, "t"] / 365, y_demo[, "I"], type = "l", lwd = 2,
+     col = "firebrick", xlab = "Time (years)", ylab = "Infectious (I)",
+     xlim = c(0, 10))
+```
+
+Instead of dying out after one wave, incidence oscillates with shrinking
+amplitude and settles to an endemic equilibrium — newborn susceptibles keep
+transmission going.
+
+## Time-varying parameters with `interpolate` {.scrollable}
+
+Parameters do not have to be constant — transmission often varies over the
+year, for example. odin can drive a parameter from a user-supplied time
+series with `interpolate()`.
+
+In the closed models so far, a single wave infects most of the population
+and then transmission is over — there is nothing left for seasonality to
+act on. To see recurrent seasonal waves we let immunity wane: recovered
+people return to the susceptible compartment at rate $\omega$ (mean
+immunity duration $1/\omega$, here 90 days). This is the SIRS model, with
+a seasonal `beta`:
+
+```{r}
+sirs_seasonal <- odin::odin({
+  deriv(S) <- -beta * S * I + omega * R
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I - omega * R
+  beta <- interpolate(tt, bb, "linear")
+  tt[] <- user()   # time points
+  bb[] <- user()   # beta at each time point
+  dim(tt) <- user()
+  dim(bb) <- user()
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  N0    <- user(1000)
+  I0    <- user(1)
+  gamma <- user(0.1)    # infectious period 10 days
+  omega <- user(1 / 90) # immunity lasts 90 days on average
+})
+```
+
+## The forcing series
+
+Monthly values over five years, peaking in "winter":
+
+```{r}
+t_years <- 5
+tt <- seq(0, 365 * t_years, by = 365 / 12)   # monthly knots
+bb <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt / 365))
+```
+
+Always plot the series you feed into a model, before running anything.
+
+## The forcing series, plotted
+
+```{r}
+#| fig-height: 4.5
+plot(tt / 365, bb, type = "b", pch = 16, cex = 0.5,
+     xlab = "Time (years)", ylab = expression(beta))
+```
+
+## Seasonal waves
+
+Then pass the vectors at `$new()`; odin infers their lengths:
+
+```{r}
+m <- sirs_seasonal$new(tt = tt, bb = bb)
+t_run <- seq(0, 365 * t_years, by = 1)
+y_seas <- m$run(t_run)
+```
+
+```{r}
+#| fig-height: 3.6
+plot(t_run / 365, y_seas[, "I"], type = "l", lwd = 1.5, col = "firebrick",
+     xlab = "Time (years)", ylab = "Infectious (I)")
+```
+
+After the first (largest) wave, incidence settles into annual waves that
+track the forcing, each peaking shortly after `beta` peaks.
+
+## Arrays and dimensions in odin
+
+- Arrays need explicit dimension declarations: `tt[] <- user()` together
+  with `dim(tt) <- user()`
+- At `$new()` you pass just the vectors; odin works out their lengths
+- Interpolation types: `"constant"`, `"linear"`, `"spline"`
+
+## Exercise 2.1 — A less variable latent period
+
+A single $E$ compartment implies an exponential latent period: many people
+become infectious almost immediately, a few only after a very long time.
+
+- Chain two exposed compartments $E_1 \to E_2$, each progressing at rate
+  `2 * sigma`
+- The mean latent period stays `1/sigma`, but is less variable (an Erlang
+  distribution)
+
+Build this model, run it with `sigma = 1/8` next to the single-$E$
+version, and compare the epidemic curves.
+
+## Exercise 2.2 — Disease-induced mortality
+
+Extend the demography model (`seir_demo`) so that infectious people die at an
+additional rate `delta` (disease-induced mortality):
+
+- Deaths accumulate in a new compartment `D` (`deriv(D) <- delta * I`)
+- The living population is no longer constant
+
+Run 20 years with `delta = 0` and `delta = 0.01`, and plot the total
+population size over time (compute it in R with `rowSums` on the compartment
+columns), with the y-axis starting at 0. What happens? And what goes wrong if
+you let R choose the axis limits?
+
+## Recap
+
+- New compartments = new `deriv()` + `initial()` lines, and re-routing
+  flows
+- Births and deaths turn a single epidemic into endemic dynamics
+- One generator, many `$new()` calls: the scenario workflow
+- Time-varying parameters: `interpolate()` drives a parameter from a
+  user-supplied time series — plot the series first, then let odin infer
+  the array lengths

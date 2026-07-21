@@ -1,0 +1,35 @@
+project:
+  type: book
+  render:
+    - index.qmd
+    - lectures/*.qmd
+    - slides.qmd
+
+# Bundle the rendered slide decks into the book site (run
+# `quarto render slides` first so these are up to date)
+resources:
+  - slides/*.html
+
+book:
+  title: "Coding compartmental models with R and odin"
+  subtitle: "Session B3"
+  author: "Swapnil Mishra"
+  date: today
+  chapters:
+    - index.qmd
+    - lectures/01-odin-basics-sir.qmd
+    - lectures/02-extending-models.qmd
+    - slides.qmd
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: false
+    code-tools: true
+    highlight-style: github
+
+execute:
+  echo: true
+  warning: false
+  message: false

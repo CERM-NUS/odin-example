@@ -1,0 +1,11 @@
+# Slide decks {.unnumbered}
+
+The revealjs slide decks for presenting the session. Each deck is a single
+self-contained HTML file — open in a browser, use arrow keys to navigate,
+`f` for fullscreen, `o` for slide overview.
+
+- [B3_1 slides: odin basics & the SIR model](slides/slides-01-odin-basics-sir.html)
+- [B3_2 slides: extending models — SEIR, demography & time-varying parameters](slides/slides-02-extending-models.html)
+
+The book chapters (@sec-lecture1 and @sec-lecture2) cover the same material
+with full notes, exercises and solutions.
