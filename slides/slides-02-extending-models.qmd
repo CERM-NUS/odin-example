@@ -242,12 +242,42 @@ plot(t_run / 365, y_seas[, "I"], type = "l", lwd = 1.5, col = "firebrick",
 After the first (largest) wave, incidence settles into annual waves that
 track the forcing, each peaking shortly after `beta` peaks.
 
-## Arrays and dimensions in odin
+## What `interpolate()` is doing
 
-- Arrays need explicit dimension declarations: `tt[] <- user()` together
-  with `dim(tt) <- user()`
-- At `$new()` you pass just the vectors; odin works out their lengths
-- Interpolation types: `"constant"`, `"linear"`, `"spline"`
+- The solver evaluates the equations at whatever times its internal steps
+  require — not just at your monthly knots
+- `interpolate(tt, bb, type)` turns your points into a continuous
+  `beta(t)`; `type` decides what happens *between* the knots
+- `dim(tt) <- user()` cannot be left out: odin compiles the model before it
+  sees any data, so every array needs a declared size at compile time —
+  "user" means the length is fixed at `$new()`, where odin infers it from
+  the vectors you pass
+
+## The three interpolation types
+
+```{r}
+#| fig-height: 4.2
+tt_yr <- seq(0, 365, by = 365 / 12)
+bb_yr <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt_yr / 365))
+grid  <- seq(0, 365, by = 1)
+plot(grid, spline(tt_yr, bb_yr, xout = grid)$y, type = "l", lwd = 2,
+     col = "steelblue", xlab = "Time (days)", ylab = expression(beta))
+lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "linear")$y,
+      lwd = 2, col = "firebrick")
+lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "constant")$y,
+      lwd = 2, col = "darkgreen", lty = 2)
+points(tt_yr, bb_yr, pch = 16)
+legend("bottomleft",
+       legend = c("spline (smooth)", "linear (straight segments)",
+                  "constant (steps)", "knots"),
+       col = c("steelblue", "firebrick", "darkgreen", "black"),
+       lwd = c(2, 2, 2, NA), lty = c(1, 1, 2, NA),
+       pch = c(NA, NA, NA, 16), bty = "n", cex = 0.8)
+```
+
+- `"constant"` — steps; for quantities that change in jumps
+- `"linear"` — joins the dots; good default for smooth drivers
+- `"spline"` — smooth curve; can overshoot between widely spaced knots
 
 ## Exercise 2.1 — A less variable latent period
 

@@ -99,6 +99,13 @@ Note two things:
 - The result, `sir_generator`, is not a model — it is a model generator: a
   factory that creates model instances.
 
+Notice also what the model does *not* contain: `N <- S + I + R`. Nothing in
+the equations uses `N` — with density-dependent transmission and no births,
+it plays no role, so there is nothing to compute. You only need `N` when an
+equation references it: a birth term like `mu * N` (you will see this in
+B3_2), frequency-dependent transmission (`beta * S * I / N`), or any other
+per-capita rate.
+
 ## Running the model
 
 Create an instance and run it over a vector of times:
