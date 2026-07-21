@@ -5,7 +5,7 @@ in R with [odin](https://mrc-ide.github.io/odin/).
 
 ## Contents
 
-A 90-minute session, "Coding compartmental models with R and odin", in two
+Session "Coding compartmental models with R and odin", in two
 parts (B3_1 and B3_2), available both as a Quarto book (for
 self-study / following along) and as revealjs slide decks (for presenting):
 
