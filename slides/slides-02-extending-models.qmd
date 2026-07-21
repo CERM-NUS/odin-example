@@ -325,10 +325,11 @@ track the forcing, each peaking shortly after `beta` peaks.
 
 ## The three interpolation types
 
+::: columns
+
+::: {.column width="42%" style="font-size: 0.62em;"}
 ```{r}
-#| fig-width: 10
-#| fig-height: 6.5
-#| out-width: 95%
+#| fig-show: hide
 tt_yr <- seq(0, 365, by = 365 / 12)
 bb_yr <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt_yr / 365))
 grid  <- seq(0, 365, by = 1)
@@ -347,6 +348,32 @@ legend("bottomleft",
        lwd = c(3, 3, 2.5, NA), lty = c(1, 2, 1, NA),
        pch = c(NA, NA, NA, 16), bty = "n", cex = 1.2)
 ```
+:::
+
+::: {.column width="58%"}
+```{r}
+#| echo: false
+#| fig-width: 7
+#| fig-height: 6.2
+#| out-width: 100%
+plot(grid, spline(tt_yr, bb_yr, xout = grid)$y, type = "l", lwd = 3,
+     col = "#08519c", xlab = "Time (days)", ylab = expression(beta),
+     cex.axis = 1.3, cex.lab = 1.4)
+lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "linear")$y,
+      lwd = 3, col = "#d7301f", lty = 2)
+lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "constant")$y,
+      lwd = 2.5, col = "grey30")
+points(tt_yr, bb_yr, pch = 16, cex = 1.6)
+legend("bottomleft",
+       legend = c("spline (smooth, solid navy)", "linear (dashed red)",
+                  "constant (steps, grey)", "knots"),
+       col = c("#08519c", "#d7301f", "grey30", "black"),
+       lwd = c(3, 3, 2.5, NA), lty = c(1, 2, 1, NA),
+       pch = c(NA, NA, NA, 16), bty = "n", cex = 1.2)
+```
+:::
+
+:::
 
 ## Exercise 2.1 — A less variable latent period
 
