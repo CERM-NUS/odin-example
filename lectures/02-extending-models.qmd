@@ -327,13 +327,19 @@ number ourselves.
 ::: {.callout-tip collapse="true"}
 ## Exercise 2.1 — A less variable latent period
 
-A single $E$ compartment implies an *exponential* latent period: many people
-become infectious almost immediately, and a few only after a very long time.
+A single $E$ compartment implies an *exponential* latent period: the most
+likely outcome is becoming infectious **immediately**, with a long tail of
+very long stays. Its variance equals the mean squared — the most variable
+distribution possible for a given mean, and not what real latent periods
+look like.
+
 A common trick is to chain two exposed compartments $E_1 \to E_2$, each
-progressing at rate `2 * sigma`, which keeps the mean latent period at
-`1/sigma` but makes it less variable (an Erlang distribution). Build this
-model, run it with `sigma = 1/8` next to the single-$E$ version, and compare
-the epidemic curves.
+progressing at rate `2 * sigma`. The mean latent period is still `1/sigma`
+(two stages of mean `1/(2*sigma)` each), but the distribution becomes
+Erlang (Gamma with shape 2): the variance is **halved**, so latent periods
+cluster around the mean instead of piling up near zero. Build this model,
+run it with `sigma = 1/8` next to the single-$E$ version, and compare the
+epidemic curves.
 
 ```{r}
 #| code-fold: true
@@ -373,6 +379,29 @@ model takes off later (peak around day 148 vs day 142), because fewer people
 race through the latent period unrealistically fast. Chaining more
 compartments ($E_1 \to E_2 \to E_3 \dots$) makes the latent period
 progressively tighter around its mean.
+
+To see *why* the difference is small here, look at the two latent-period
+distributions the models imply:
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show solution"
+#| fig-cap: "Same 8-day mean latent period: exponential (single E) vs Erlang-2 (chained)"
+x <- seq(0, 30, by = 0.1)
+plot(x, dexp(x, rate = 1 / 8), type = "l", lwd = 2, col = "grey60",
+     xlab = "Latent period (days)", ylab = "Density")
+lines(x, dgamma(x, shape = 2, rate = 2 / 8), lwd = 2, col = "firebrick")
+legend("topright",
+       legend = c("single E: exponential, variance 64",
+                  "chained: Erlang-2, variance 32"),
+       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+```
+
+The grey exponential says the most likely latent period is near zero — many
+people become infectious almost immediately. The red Erlang-2 is zero at
+zero, peaks near the mean, and has half the variance: latent periods cluster
+around 8 days. Same mean — what changes is the *spread*, and that is what
+the extra compartment buys you.
 :::
 
 ::: {.callout-tip collapse="true"}

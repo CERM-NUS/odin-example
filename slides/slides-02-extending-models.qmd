@@ -350,13 +350,15 @@ legend("bottomleft",
 
 ## Exercise 2.1 — A less variable latent period
 
-A single $E$ compartment implies an exponential latent period: many people
-become infectious almost immediately, a few only after a very long time.
+A single $E$ compartment implies an exponential latent period: the most
+likely outcome is becoming infectious *immediately*, with a long tail —
+variance equals the mean squared. Real latent periods cluster around the
+mean, so we want **less** variability, not more:
 
 - Chain two exposed compartments $E_1 \to E_2$, each progressing at rate
   `2 * sigma`
-- The mean latent period stays `1/sigma`, but is less variable (an Erlang
-  distribution)
+- The mean latent period stays `1/sigma`, but the variance is halved (an
+  Erlang distribution)
 
 Build this model, run it with `sigma = 1/8` next to the single-$E$
 version, and compare the epidemic curves.
