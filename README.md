@@ -20,7 +20,7 @@ kept for reference; the lectures above are the maintained teaching material.
 ## Prerequisites
 
 - R (≥ 4.1) with a C compiler (macOS: `xcode-select --install`; Windows: Rtools)
-- `install.packages("odin")` — the only modelling package used
+- `install.packages(c("odin", "pkgbuild", "pkgload"))` — the only packages used
 - Check your setup with `odin::can_compile()`
 
 ## Rendering

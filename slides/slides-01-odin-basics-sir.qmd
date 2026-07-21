@@ -21,6 +21,38 @@ Swapnil Mishra (Asst. Professor)
 
 [Session book: notes, exercises and solutions](../index.html){style="font-size: 0.55em;"}
 
+## Before we start: setup
+
+You need R (≥ 4.1) and a C compiler:
+
+- macOS: `xcode-select --install`
+- Windows: [Rtools](https://cran.r-project.org/bin/windows/Rtools/)
+- Linux: `gcc` is usually already present
+
+Then install the packages (odin plus its compile-time helpers):
+
+```{r}
+#| eval: false
+install.packages(c("odin", "pkgbuild", "pkgload"))
+```
+
+Check that everything works — this compiles a small test model:
+
+```{r}
+#| eval: false
+odin::can_compile()
+#> [1] TRUE
+```
+
+## How to follow along
+
+1. Create a new project: *File → New Project → New Directory → New Project*
+2. Open a new R script: *File → New File → R Script*
+3. Paste each code chunk there as we go and run it
+
+The slides are online (link on the last slide), so you can copy the code
+from them at any time.
+
 ## Why odin?
 
 A compartmental model is a set of ordinary differential equations (ODEs).

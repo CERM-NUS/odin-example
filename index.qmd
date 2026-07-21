@@ -37,11 +37,11 @@ You need R (≥ 4.1) and a working C compiler:
 - **Windows**: install [Rtools](https://cran.r-project.org/bin/windows/Rtools/)
 - **Linux**: `gcc` is usually already present
 
-Then install odin from CRAN:
+Then install the packages from CRAN — odin plus its compile-time helpers:
 
 ```{r}
 #| eval: false
-install.packages("odin")
+install.packages(c("odin", "pkgbuild", "pkgload"))
 ```
 
 Check that odin can compile models on your machine (this compiles a small test
@@ -53,8 +53,9 @@ odin::can_compile()
 #> [1] TRUE
 ```
 
-All plotting in the course uses base R, so odin is the only package you need
-to install.
+All plotting in the course uses base R, so these are the only packages you
+need to install. During the session, work in a fresh project (*File → New
+Project*) with a new R script and paste the code chunks there as we go.
 
 ## A note on odin versions
 
