@@ -94,7 +94,6 @@ gives a later, broader peak — the latent period slows the epidemic down even
 though it does not change $R_0$. Rather than take that on trust, plot both:
 
 ```{r}
-#| fig-height: 4
 sir_generator <- odin::odin({
   deriv(S) <- -beta * S * I
   deriv(I) <- beta * S * I - gamma * I
@@ -108,6 +107,12 @@ sir_generator <- odin::odin({
   gamma <- user(0.1)
 })
 y_sir <- sir_generator$new()$run(t)
+```
+
+## SEIR vs SIR: the comparison
+
+```{r}
+#| fig-height: 5.2
 plot(t, y_sir[, "I"], type = "l", lwd = 2, col = "grey60",
      xlab = "Time (days)", ylab = "Infectious (I)")
 lines(t, y_seir[, "I"], lwd = 2, col = "firebrick")
@@ -310,6 +315,9 @@ track the forcing, each peaking shortly after `beta` peaks.
   require — not just at your monthly knots
 - `interpolate(tt, bb, type)` turns your points into a continuous
   `beta(t)`; `type` decides what happens *between* the knots
+- `"constant"` — steps; for quantities that change in jumps
+- `"linear"` — joins the dots; good default for smooth drivers
+- `"spline"` — smooth curve; can overshoot between widely spaced knots
 - `dim(tt) <- user()` cannot be left out: odin compiles the model before it
   sees any data, so every array needs a declared size at compile time —
   "user" means the length is fixed at `$new()`, where odin infers it from
@@ -318,28 +326,27 @@ track the forcing, each peaking shortly after `beta` peaks.
 ## The three interpolation types
 
 ```{r}
-#| fig-height: 4.8
+#| fig-width: 10
+#| fig-height: 6.5
+#| out-width: 95%
 tt_yr <- seq(0, 365, by = 365 / 12)
 bb_yr <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt_yr / 365))
 grid  <- seq(0, 365, by = 1)
-plot(grid, spline(tt_yr, bb_yr, xout = grid)$y, type = "l", lwd = 2.5,
-     col = "#08519c", xlab = "Time (days)", ylab = expression(beta))
+plot(grid, spline(tt_yr, bb_yr, xout = grid)$y, type = "l", lwd = 3,
+     col = "#08519c", xlab = "Time (days)", ylab = expression(beta),
+     cex.axis = 1.3, cex.lab = 1.4)
 lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "linear")$y,
-      lwd = 2.5, col = "#d7301f", lty = 2)
+      lwd = 3, col = "#d7301f", lty = 2)
 lines(grid, approx(tt_yr, bb_yr, xout = grid, method = "constant")$y,
-      lwd = 2, col = "grey30")
-points(tt_yr, bb_yr, pch = 16, cex = 1.2)
+      lwd = 2.5, col = "grey30")
+points(tt_yr, bb_yr, pch = 16, cex = 1.6)
 legend("bottomleft",
        legend = c("spline (smooth, solid navy)", "linear (dashed red)",
                   "constant (steps, grey)", "knots"),
        col = c("#08519c", "#d7301f", "grey30", "black"),
-       lwd = c(2.5, 2.5, 2, NA), lty = c(1, 2, 1, NA),
-       pch = c(NA, NA, NA, 16), bty = "n", cex = 0.8)
+       lwd = c(3, 3, 2.5, NA), lty = c(1, 2, 1, NA),
+       pch = c(NA, NA, NA, 16), bty = "n", cex = 1.2)
 ```
-
-- `"constant"` — steps; for quantities that change in jumps
-- `"linear"` — joins the dots; good default for smooth drivers
-- `"spline"` — smooth curve; can overshoot between widely spaced knots
 
 ## Exercise 2.1 — A less variable latent period
 

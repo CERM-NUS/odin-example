@@ -288,8 +288,8 @@ knots:
 
 ```{r}
 #| fig-cap: "The same monthly knots under the three interpolation types"
-#| fig-width: 9
-#| fig-height: 5.5
+#| fig-width: 10
+#| fig-height: 6.2
 tt_yr <- seq(0, 365, by = 365 / 12)   # one year of knots
 bb_yr <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt_yr / 365))
 grid  <- seq(0, 365, by = 1)
