@@ -1,7 +1,5 @@
 ---
-title: "B3_1: odin basics & the SIR model"
-subtitle: "Coding compartmental models with R and odin"
-author: "Swapnil Mishra (Asst. Professor)"
+pagetitle: "B3_1: odin basics & the SIR model"
 format:
   revealjs:
     theme:
@@ -13,11 +11,13 @@ format:
 echo: true
 ---
 
-::: {layout="[[1,1,1]]" layout-valign="center"}
-![](../logos/sshsph.png){height="60px"}
-![](../logos/cerm.png){height="60px"}
-![](../logos/mlghn.png){height="60px"}
-:::
+## B3_1: odin basics & the SIR model {.title-slide}
+
+Coding compartmental models with R and odin
+
+Swapnil Mishra (Asst. Professor)
+
+![](../logos/sshsph.png){height="55px"} ![](../logos/cerm.png){height="55px"} ![](../logos/mlghn.png){height="55px"}
 
 [Session book: notes, exercises and solutions](../index.html){style="font-size: 0.55em;"}
 
@@ -257,3 +257,9 @@ model. What happens, and why does no epidemic occur?
 
 **Next:** Lecture 2 — latent periods, births and deaths, and parameters
 that change over time.
+
+## Next up
+
+[B3_2 slides: extending models — SEIR, demography & time-varying parameters](slides-02-extending-models.html)
+
+[Session book: notes, exercises and solutions](../index.html)

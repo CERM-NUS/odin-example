@@ -36,6 +36,21 @@ $link-color: $nus-blue-2;
   font-size: 0.7em;
 }
 
+// Title slide
+.reveal .slides section.title-slide {
+  text-align: center;
+}
+
+.reveal .slides section.title-slide h2 {
+  border-bottom: none;
+  font-size: 1.5em;
+  color: $nus-blue;
+}
+
+.reveal .slides section.title-slide p {
+  color: #5a6a7a;
+}
+
 // Section headings with a quiet rule
 .reveal .slides h2 {
   border-bottom: 2px solid #d7dee8;

@@ -1,7 +1,5 @@
 ---
-title: "B3_2: Extending models — SEIR, demography & time-varying parameters"
-subtitle: "Coding compartmental models with R and odin"
-author: "Swapnil Mishra (Asst. Professor)"
+pagetitle: "B3_2: Extending models — SEIR, demography & time-varying parameters"
 format:
   revealjs:
     theme:
@@ -13,11 +11,13 @@ format:
 echo: true
 ---
 
-::: {layout="[[1,1,1]]" layout-valign="center"}
-![](../logos/sshsph.png){height="60px"}
-![](../logos/cerm.png){height="60px"}
-![](../logos/mlghn.png){height="60px"}
-:::
+## B3_2: Extending models — SEIR, demography & time-varying parameters {.title-slide}
+
+Coding compartmental models with R and odin
+
+Swapnil Mishra (Asst. Professor)
+
+![](../logos/sshsph.png){height="55px"} ![](../logos/cerm.png){height="55px"} ![](../logos/mlghn.png){height="55px"}
 
 [Session book: notes, exercises and solutions](../index.html){style="font-size: 0.55em;"}
 
@@ -284,3 +284,9 @@ you let R choose the axis limits?
 - Time-varying parameters: `interpolate()` drives a parameter from a
   user-supplied time series — plot the series first, then let odin infer
   the array lengths
+
+## Links
+
+[Session book: notes, exercises and solutions](../index.html)
+
+[B3_1 slides: odin basics & the SIR model](slides-01-odin-basics-sir.html)

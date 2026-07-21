@@ -69,8 +69,4 @@ carry over directly; the main syntax differences are that odin2 uses
 
 *Instructor: Swapnil Mishra (Asst. Professor)*
 
-::: {layout="[[1,1,1]]" layout-valign="center"}
-![](logos/sshsph.png){height="70px"}
-![](logos/cerm.png){height="70px"}
-![](logos/mlghn.png){height="70px"}
-:::
+![](logos/sshsph.png){height="70px"} ![](logos/cerm.png){height="70px"} ![](logos/mlghn.png){height="70px"}
