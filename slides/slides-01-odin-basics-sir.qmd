@@ -160,7 +160,7 @@ per requested time point.
 ## Plotting with base R
 
 ```{r}
-#| fig-height: 4.5
+#| fig-height: 5.2
 matplot(y[, "t"], y[, c("S", "I", "R")],
         type = "l", lty = 1, lwd = 2,
         col = c("steelblue", "firebrick", "darkgreen"),
@@ -206,22 +206,30 @@ sir_generator <- odin::odin({
 Scenarios are now cheap — pass new parameter values to `$new()`:
 
 ```{r}
-#| fig-height: 4.5
 beta_values <- c(3e-4, 2e-4, 1.5e-4)
-plot(NULL, xlim = range(t), ylim = c(0, 350),
-     xlab = "Time (days)", ylab = "Infectious (I)")
-for (b in beta_values) {
-  m <- sir_generator$new(beta = b)
-  lines(t, m$run(t)[, "I"], lwd = 2,
-        col = hcl.colors(length(beta_values), "Berlin")[which(beta_values == b)])
-}
-legend("topright", legend = paste("beta =", beta_values,
-                                  "(R0 =", beta_values * 1000 / 0.1, ")"),
-       col = hcl.colors(length(beta_values), "Berlin"), lwd = 2, bty = "n")
+curves <- lapply(beta_values,
+                 function(b) sir_generator$new(beta = b)$run(t))
 ```
 
 Compilation happens once; every scenario after that is just `$new()` and
 `$run()`.
+
+## Scenarios: the epidemic curves
+
+```{r}
+#| fig-height: 5.2
+cols <- hcl.colors(length(beta_values), "Berlin")
+plot(NULL, xlim = range(t), ylim = c(0, 350),
+     xlab = "Time (days)", ylab = "Infectious (I)")
+for (i in seq_along(beta_values)) {
+  lines(t, curves[[i]][, "I"], lwd = 2, col = cols[i])
+}
+legend("topright", legend = paste("beta =", beta_values,
+                                  "(R0 =", beta_values * 1000 / 0.1, ")"),
+       col = cols, lwd = 2, bty = "n")
+```
+
+Peak prevalence falls as transmission slows.
 
 ## Notes on scenarios
 
@@ -255,7 +263,7 @@ sir_inc <- odin::odin({
 ## The final size of the epidemic
 
 ```{r}
-#| fig-height: 4.2
+#| fig-height: 5.0
 y <- sir_inc$new()$run(t)
 plot(y[, "t"], y[, "cum_inc"], type = "l", lwd = 2,
      xlab = "Time (days)", ylab = "Cumulative infections")

@@ -77,7 +77,7 @@ seir_generator <- odin::odin({
 ## SEIR dynamics
 
 ```{r}
-#| fig-height: 4.5
+#| fig-height: 5.2
 y_seir <- seir_generator$new()$run(t)
 matplot(y_seir[, "t"], y_seir[, c("S", "E", "I", "R")],
         type = "l", lty = 1, lwd = 2,
@@ -163,7 +163,7 @@ seir_demo <- odin::odin({
 ## Endemic equilibrium
 
 ```{r}
-#| fig-height: 4.5
+#| fig-height: 5.2
 t_long <- seq(0, 365 * 20, by = 7)   # 20 years, weekly output
 y_demo <- seir_demo$new()$run(t_long)
 plot(y_demo[, "t"] / 365, y_demo[, "I"], type = "l", lwd = 2,
@@ -217,7 +217,7 @@ sir_step <- odin::odin({
 ## A shift in regime: forcing
 
 ```{r}
-#| fig-height: 3.8
+#| fig-height: 4.2
 ## two regimes: beta halves at day 40
 tt <- c(0, 40, 150)
 bb <- c(2e-4, 1e-4, 1e-4)
@@ -230,7 +230,7 @@ Always plot what you are feeding in, before running.
 ## A shift in regime: epidemic curve
 
 ```{r}
-#| fig-height: 4.2
+#| fig-height: 5.2
 y_step   <- sir_step$new(tt = tt, bb = bb)$run(t)
 y_nostep <- sir_generator$new()$run(t)   # baseline: constant beta
 plot(t, y_nostep[, "I"], type = "l", lwd = 2, col = "grey60",
@@ -301,7 +301,7 @@ y_seas <- m$run(t_run)
 ```
 
 ```{r}
-#| fig-height: 3.6
+#| fig-height: 4.8
 plot(t_run / 365, y_seas[, "I"], type = "l", lwd = 1.5, col = "firebrick",
      xlab = "Time (years)", ylab = "Infectious (I)")
 ```
