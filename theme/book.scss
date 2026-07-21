@@ -1,0 +1,70 @@
+/*-- scss:defaults --*/
+
+// Academic theme for the session book.
+// Palette follows the partner logos: NUS blue + a restrained teal accent.
+
+$nus-blue:   #003d7c;
+$nus-blue-2: #0b5cad;
+$teal:       #17878b;
+$ink:        #1c2833;
+
+$primary:       $nus-blue;
+$link-color:    $nus-blue-2;
+$headings-color: $nus-blue;
+
+$font-family-serif: Georgia, "Times New Roman", Times, serif;
+$font-family-base:  $font-family-serif;
+$font-size-base:    1.02rem;
+$headings-font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+$headings-font-weight: 600;
+
+$code-color: #6b4e8e;
+$code-bg:    #f5f6f8;
+
+/*-- scss:rules --*/
+
+// Book title block
+#title-block-header .title {
+  font-family: $headings-font-family;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: $nus-blue;
+}
+
+#title-block-header .subtitle {
+  color: $teal;
+  font-weight: 500;
+}
+
+// Sidebar
+.sidebar-title {
+  font-family: $headings-font-family;
+  color: $nus-blue;
+}
+
+.sidebar-navigation a {
+  font-family: $headings-font-family;
+  font-size: 0.92em;
+}
+
+// Chapter headings get a quiet rule underneath
+h1.title, h2 {
+  border-bottom: 1px solid #d7dee8;
+  padding-bottom: 0.3rem;
+}
+
+// Code cells: light, unobtrusive
+div.sourceCode {
+  border-left: 3px solid #d7dee8;
+}
+
+// Callouts in a flatter academic style
+.callout {
+  border-left-width: 3px;
+}
+
+// Table header of the timetable
+thead th {
+  font-family: $headings-font-family;
+  color: $nus-blue;
+}

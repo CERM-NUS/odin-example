@@ -23,7 +23,9 @@ book:
 
 format:
   html:
-    theme: cosmo
+    theme:
+      - cosmo
+      - theme/book.scss
     toc: true
     code-fold: false
     code-tools: true

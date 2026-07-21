@@ -1,0 +1,74 @@
+/*-- scss:defaults --*/
+
+// Academic theme for the session slides (matches theme/book.scss).
+
+$nus-blue:   #003d7c;
+$nus-blue-2: #0b5cad;
+$teal:       #17878b;
+$ink:        #1c2833;
+
+$font-family-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
+$presentation-heading-font: $font-family-sans-serif;
+$presentation-heading-color: $nus-blue;
+$presentation-heading-font-weight: 600;
+$presentation-font-size-root: 32px;
+$presentation-line-height: 1.35;
+
+$body-color: $ink;
+$link-color: $nus-blue-2;
+
+/*-- scss:rules --*/
+
+// Title slide
+.reveal .title {
+  color: $nus-blue;
+  letter-spacing: -0.01em;
+}
+
+.reveal .subtitle {
+  color: $teal;
+  font-weight: 500;
+}
+
+.reveal .author,
+.reveal .date {
+  color: #5a6a7a;
+  font-size: 0.7em;
+}
+
+// Section headings with a quiet rule
+.reveal .slides h2 {
+  border-bottom: 2px solid #d7dee8;
+  padding-bottom: 0.25em;
+  font-size: 1.35em;
+}
+
+// Code blocks: compact and light
+.reveal div.sourceCode {
+  border-left: 3px solid #d7dee8;
+  background: #f5f6f8;
+}
+
+.reveal pre {
+  box-shadow: none;
+  font-size: 0.62em;
+  line-height: 1.35;
+}
+
+.reveal code {
+  color: #6b4e8e;
+}
+
+// Slide number, small and grey
+.reveal .slide-number {
+  font-size: 0.45em;
+  color: #8a97a3;
+  background: transparent;
+}
+
+// Keep figure captions unobtrusive
+.reveal .slide figure > figcaption,
+.reveal .slide img + p.caption {
+  font-size: 0.55em;
+  color: #5a6a7a;
+}

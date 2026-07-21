@@ -4,8 +4,11 @@ subtitle: "Coding compartmental models with R and odin"
 author: "Swapnil Mishra (Asst. Professor)"
 format:
   revealjs:
-    theme: default
+    theme:
+      - default
+      - ../theme/slides.scss
     smaller: true
+    slide-number: true
     embed-resources: true
 echo: true
 ---
