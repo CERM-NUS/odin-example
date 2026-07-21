@@ -50,8 +50,8 @@ odin::can_compile()
 2. Open a new R script: *File → New File → R Script*
 3. Paste each code chunk there as we go and run it
 
-The slides are online (link on the last slide), so you can copy the code
-from them at any time.
+The book page has all the code with notes and solutions:
+<https://cerm-nus.github.io/odin-example/lectures/01-odin-basics-sir.html>
 
 ## Why odin?
 
@@ -287,11 +287,7 @@ model. What happens, and why does no epidemic occur?
   compilation, unlimited scenarios
 - Add a `deriv()` line for derived quantities like cumulative incidence
 
-**Next:** Lecture 2 — latent periods, births and deaths, and parameters
-that change over time.
+**Next:** [Lecture 2 — B3_2 slides: extending models — SEIR, demography &
+time-varying parameters](slides-02-extending-models.html)
 
-## Next up
-
-[B3_2 slides: extending models — SEIR, demography & time-varying parameters](slides-02-extending-models.html)
-
-[Session book: notes, exercises and solutions](../index.html)
+[Session book: notes, exercises and solutions](../index.html){style="font-size: 0.6em;"}

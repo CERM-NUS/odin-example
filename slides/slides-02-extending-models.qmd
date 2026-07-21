@@ -285,8 +285,6 @@ you let R choose the axis limits?
   user-supplied time series — plot the series first, then let odin infer
   the array lengths
 
-## Links
+**Back to:** [B3_1 slides: odin basics & the SIR model](slides-01-odin-basics-sir.html)
 
-[Session book: notes, exercises and solutions](../index.html)
-
-[B3_1 slides: odin basics & the SIR model](slides-01-odin-basics-sir.html)
+[Session book: notes, exercises and solutions](../index.html){style="font-size: 0.6em;"}
