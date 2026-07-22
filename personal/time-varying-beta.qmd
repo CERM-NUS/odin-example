@@ -92,6 +92,25 @@ out_step <- sir_step$new(beta_times = c(0, 40, 150),
                          beta_vals = c(2e-4, 1e-4, 1e-4))$run(times)
 ```
 
+## One run, beta varying in time
+
+```{r}
+#| fig-height: 5.5
+par(mfrow = c(2, 1), mar = c(3, 5, 1.5, 1) + 0.1)
+## top: the beta(t) the solver sees, built from the pair
+plot(c(0, 40, 150), c(2e-4, 1e-4, 1e-4), type = "s", lwd = 2.5,
+     xlab = "", ylab = expression(beta), xaxt = "n")
+abline(v = 40, lty = 2, col = "grey60")
+## bottom: incidence from the same single run
+plot(out_step[, "t"], out_step[, "I"], type = "l", lwd = 2.5,
+     col = "firebrick", xlab = "Time (days)", ylab = "Infectious (I)")
+abline(v = 40, lty = 2, col = "grey60")
+```
+
+One simulation: `beta` halves at day 40 (top) and the epidemic curve bends
+at exactly that point (bottom) — `beta_times` says *when*, `beta_vals` says
+*what*.
+
 ## Part 2: fake data with a known beta
 
 ```{r}
