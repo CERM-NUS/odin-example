@@ -207,8 +207,10 @@ Scenarios are now cheap — pass new parameter values to `$new()`:
 
 ```{r}
 beta_values <- c(3e-4, 2e-4, 1.5e-4)
-scenario_runs <- lapply(beta_values,   # one run per beta value
-                        function(beta_i) sir_generator$new(beta = beta_i)$run(times))
+scenario_runs <- list()                 # one run per beta value
+for (i in seq_along(beta_values)) {
+  scenario_runs[[i]] <- sir_generator$new(beta = beta_values[i])$run(times)
+}
 ```
 
 Compilation happens once; every scenario after that is just `$new()` and
