@@ -66,11 +66,13 @@ the published site but not when opening the local files directly.
 
 The repo also contains personal learning materials under `personal/`. These
 are committed to the repo but never published to the website. To build the
-book locally **with** the personal chapter and slides bundled, use the
-`local` Quarto profile:
+book locally **with** the personal chapter and slides bundled:
 
 ```sh
-QUARTO_PROFILE=local quarto render    # or: QUARTO_PROFILE=local quarto preview
+./render-local.sh        # renders decks + personal deck + book (local profile)
+open _book/index.html
 ```
 
-Plain `quarto render` (and `./publish.sh`) builds the course-only version.
+(equivalent to `QUARTO_PROFILE=local quarto render` after rendering the
+decks). Plain `quarto render` (and `./publish.sh`) builds the course-only
+version.
