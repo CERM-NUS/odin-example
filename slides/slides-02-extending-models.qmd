@@ -24,7 +24,7 @@ Swapnil Mishra (Asst. Professor)
 ```{r}
 #| include: false
 library(odin)
-t <- seq(0, 150, by = 1)
+times <- seq(0, 150, by = 1)   # daily output over 150 days
 ```
 
 ## Recap of lecture 1
@@ -78,8 +78,8 @@ seir_generator <- odin::odin({
 
 ```{r}
 #| fig-height: 5.2
-y_seir <- seir_generator$new()$run(t)
-matplot(y_seir[, "t"], y_seir[, c("S", "E", "I", "R")],
+out_seir <- seir_generator$new()$run(times)
+matplot(out_seir[, "t"], out_seir[, c("S", "E", "I", "R")],
         type = "l", lty = 1, lwd = 2,
         col = c("steelblue", "orange", "firebrick", "darkgreen"),
         xlab = "Time (days)", ylab = "Number of people")
@@ -106,16 +106,16 @@ sir_generator <- odin::odin({
   beta  <- user(2e-4)
   gamma <- user(0.1)
 })
-y_sir <- sir_generator$new()$run(t)
+out_sir <- sir_generator$new()$run(times)   # plain SIR for comparison
 ```
 
 ## SEIR vs SIR: the comparison
 
 ```{r}
 #| fig-height: 5.2
-plot(t, y_sir[, "I"], type = "l", lwd = 2, col = "grey60",
+plot(times, out_sir[, "I"], type = "l", lwd = 2, col = "grey60",
      xlab = "Time (days)", ylab = "Infectious (I)")
-lines(t, y_seir[, "I"], lwd = 2, col = "firebrick")
+lines(times, out_seir[, "I"], lwd = 2, col = "firebrick")
 legend("topright", legend = c("SIR", "SEIR (4-day latent period)"),
        col = c("grey60", "firebrick"), lwd = 2, bty = "n")
 ```
@@ -164,9 +164,9 @@ seir_demo <- odin::odin({
 
 ```{r}
 #| fig-height: 5.2
-t_long <- seq(0, 365 * 20, by = 7)   # 20 years, weekly output
-y_demo <- seir_demo$new()$run(t_long)
-plot(y_demo[, "t"] / 365, y_demo[, "I"], type = "l", lwd = 2,
+times_long <- seq(0, 365 * 20, by = 7)   # 20 years, weekly output
+out_demo <- seir_demo$new()$run(times_long)
+plot(out_demo[, "t"] / 365, out_demo[, "I"], type = "l", lwd = 2,
      col = "firebrick", xlab = "Time (years)", ylab = "Infectious (I)",
      xlim = c(0, 10))
 ```
@@ -200,11 +200,11 @@ sir_step <- odin::odin({
   deriv(S) <- -beta * S * I
   deriv(I) <- beta * S * I - gamma * I
   deriv(R) <- gamma * I
-  beta <- interpolate(tt, bb, "constant")
-  tt[] <- user()   # regime change times
-  bb[] <- user()   # beta in each regime
-  dim(tt) <- user()
-  dim(bb) <- user()
+  beta <- interpolate(beta_times, beta_vals, "constant")
+  beta_times[] <- user()   # regime change times
+  beta_vals[] <- user()    # beta in each regime
+  dim(beta_times) <- user()
+  dim(beta_vals) <- user()
   initial(S) <- N0 - I0
   initial(I) <- I0
   initial(R) <- 0
@@ -219,10 +219,10 @@ sir_step <- odin::odin({
 ```{r}
 #| fig-height: 4.2
 ## two regimes: beta halves at day 40
-tt <- c(0, 40, 150)
-bb <- c(2e-4, 1e-4, 1e-4)
-plot(tt, bb, type = "s", lwd = 2, xlab = "Time (days)",
-     ylab = expression(beta), xlim = range(t))
+beta_times <- c(0, 40, 150)
+beta_vals  <- c(2e-4, 1e-4, 1e-4)
+plot(beta_times, beta_vals, type = "s", lwd = 2, xlab = "Time (days)",
+     ylab = expression(beta), xlim = range(times))
 ```
 
 Always plot what you are feeding in, before running.
@@ -231,11 +231,12 @@ Always plot what you are feeding in, before running.
 
 ```{r}
 #| fig-height: 5.2
-y_step   <- sir_step$new(tt = tt, bb = bb)$run(t)
-y_nostep <- sir_generator$new()$run(t)   # baseline: constant beta
-plot(t, y_nostep[, "I"], type = "l", lwd = 2, col = "grey60",
+out_step   <- sir_step$new(beta_times = beta_times,
+                           beta_vals = beta_vals)$run(times)
+out_nostep <- sir_generator$new()$run(times)   # baseline: constant beta
+plot(times, out_nostep[, "I"], type = "l", lwd = 2, col = "grey60",
      xlab = "Time (days)", ylab = "Infectious (I)")
-lines(t, y_step[, "I"], lwd = 2, col = "firebrick")
+lines(times, out_step[, "I"], lwd = 2, col = "firebrick")
 abline(v = 40, lty = 2)
 legend("topright", legend = c("constant beta", "beta halves at day 40"),
        col = c("grey60", "firebrick"), lwd = 2, bty = "n")
@@ -255,11 +256,11 @@ sirs_seasonal <- odin::odin({
   deriv(S) <- -beta * S * I + omega * R
   deriv(I) <- beta * S * I - gamma * I
   deriv(R) <- gamma * I - omega * R
-  beta <- interpolate(tt, bb, "linear")
-  tt[] <- user()   # time points
-  bb[] <- user()   # beta at each time point
-  dim(tt) <- user()
-  dim(bb) <- user()
+  beta <- interpolate(beta_times, beta_vals, "linear")
+  beta_times[] <- user()   # time points
+  beta_vals[] <- user()    # beta at each time point
+  dim(beta_times) <- user()
+  dim(beta_vals) <- user()
   initial(S) <- N0 - I0
   initial(I) <- I0
   initial(R) <- 0
@@ -276,8 +277,8 @@ Monthly values over five years, peaking in "winter":
 
 ```{r}
 t_years <- 5
-tt <- seq(0, 365 * t_years, by = 365 / 12)   # monthly knots
-bb <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt / 365))
+beta_times <- seq(0, 365 * t_years, by = 365 / 12)   # monthly knots
+beta_vals  <- 2e-4 * (1 + 0.3 * cos(2 * pi * beta_times / 365))
 ```
 
 Always plot the series you feed into a model, before running anything.
@@ -286,7 +287,7 @@ Always plot the series you feed into a model, before running anything.
 
 ```{r}
 #| fig-height: 4.5
-plot(tt / 365, bb, type = "b", pch = 16, cex = 0.5,
+plot(beta_times / 365, beta_vals, type = "b", pch = 16, cex = 0.5,
      xlab = "Time (years)", ylab = expression(beta))
 ```
 
@@ -295,15 +296,15 @@ plot(tt / 365, bb, type = "b", pch = 16, cex = 0.5,
 Then pass the vectors at `$new()`; odin infers their lengths:
 
 ```{r}
-m <- sirs_seasonal$new(tt = tt, bb = bb)
-t_run <- seq(0, 365 * t_years, by = 1)
-y_seas <- m$run(t_run)
+mod <- sirs_seasonal$new(beta_times = beta_times, beta_vals = beta_vals)
+times_seas <- seq(0, 365 * t_years, by = 1)   # daily output over 5 years
+out_seas <- mod$run(times_seas)
 ```
 
 ```{r}
 #| fig-height: 4.8
-plot(t_run / 365, y_seas[, "I"], type = "l", lwd = 1.5, col = "firebrick",
-     xlab = "Time (years)", ylab = "Infectious (I)")
+plot(times_seas / 365, out_seas[, "I"], type = "l", lwd = 1.5,
+     col = "firebrick", xlab = "Time (years)", ylab = "Infectious (I)")
 ```
 
 After the first (largest) wave, incidence settles into annual waves that
@@ -313,26 +314,26 @@ track the forcing, each peaking shortly after `beta` peaks.
 
 - The solver evaluates the equations at whatever times its internal steps
   require — not just at your monthly knots
-- `interpolate(tt, bb, type)` turns your points into a continuous
-  `beta(t)`; `type` decides what happens *between* the knots
+- `interpolate(beta_times, beta_vals, type)` turns your points into a
+  continuous `beta(t)`; `type` decides what happens *between* the knots
 - `"constant"` — steps; for quantities that change in jumps
 - `"linear"` — joins the dots; good default for smooth drivers
 - `"spline"` — smooth curve; can overshoot between widely spaced knots
-- `dim(tt) <- user()` cannot be left out: odin compiles the model before it
-  sees any data, so every array needs a declared size at compile time —
-  "user" means the length is fixed at `$new()`, where odin infers it from
-  the vectors you pass
+- `dim(beta_times) <- user()` cannot be left out: odin compiles the model
+  before it sees any data, so every array needs a declared size at compile
+  time — "user" means the length is fixed at `$new()`, where odin infers
+  it from the vectors you pass
 
 ## The three interpolation types
 
 ```{r}
-tt_yr <- seq(0, 365, by = 365 / 4)   # quarterly knots — wider apart on purpose
-bb_yr <- 2e-4 * (1 + 0.3 * cos(2 * pi * tt_yr / 365))
-grid  <- seq(0, 365, by = 1)
+knot_times <- seq(0, 365, by = 365 / 4)   # quarterly knots — wider apart on purpose
+knot_vals  <- 2e-4 * (1 + 0.3 * cos(2 * pi * knot_times / 365))
+days       <- seq(0, 365, by = 1)   # daily points to evaluate the curves on
 
-spl <- spline(tt_yr, bb_yr, xout = grid)$y                    # "spline"
-lin <- approx(tt_yr, bb_yr, xout = grid, method = "linear")$y   # "linear"
-con <- approx(tt_yr, bb_yr, xout = grid, method = "constant")$y # "constant"
+beta_spline   <- spline(knot_times, knot_vals, xout = days)$y                     # "spline"
+beta_linear   <- approx(knot_times, knot_vals, xout = days, method = "linear")$y  # "linear"
+beta_constant <- approx(knot_times, knot_vals, xout = days, method = "constant")$y # "constant"
 ```
 
 ```{r}
@@ -341,12 +342,12 @@ con <- approx(tt_yr, bb_yr, xout = grid, method = "constant")$y # "constant"
 #| fig-height: 5.5
 #| out-width: 95%
 par(mar = c(4.5, 5, 2.5, 1) + 0.1)
-plot(grid, spl, type = "l", lwd = 3,
+plot(days, beta_spline, type = "l", lwd = 3,
      col = "#08519c", xlab = "Time (days)", ylab = expression(beta),
      cex.axis = 1.2, cex.lab = 1.3)
-lines(grid, lin, lwd = 3, col = "#d7301f", lty = 2)
-lines(grid, con, lwd = 2.5, col = "grey30")
-points(tt_yr, bb_yr, pch = 16, cex = 1.6)
+lines(days, beta_linear, lwd = 3, col = "#d7301f", lty = 2)
+lines(days, beta_constant, lwd = 2.5, col = "grey30")
+points(knot_times, knot_vals, pch = 16, cex = 1.6)
 legend("top", legend = c("spline", "linear", "constant", "knots"),
        col = c("#08519c", "#d7301f", "grey30", "black"),
        lwd = c(3, 3, 2.5, NA), lty = c(1, 2, 1, NA),

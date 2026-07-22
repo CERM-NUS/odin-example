@@ -108,18 +108,18 @@ Create an instance and run it over a vector of times:
 ```{r}
 sir <- sir_generator$new()
 
-t <- seq(0, 150, by = 1)
-y <- sir$run(t)
+times <- seq(0, 150, by = 1)   # daily output over 150 days
+out <- sir$run(times)
 
-head(y)
+head(out)
 ```
 
-`y` is a data frame with one column per compartment plus time `t`, and one
+`out` is a data frame with one column per compartment plus time `t`, and one
 row per requested time point. Plot it with base R:
 
 ```{r}
 #| fig-cap: "SIR epidemic curve: R0 = beta * N / gamma = 2"
-matplot(y[, "t"], y[, c("S", "I", "R")],
+matplot(out[, "t"], out[, c("S", "I", "R")],
         type = "l", lty = 1, lwd = 2,
         col = c("steelblue", "firebrick", "darkgreen"),
         xlab = "Time (days)", ylab = "Number of people")
@@ -157,7 +157,7 @@ sir_generator <- odin::odin({
 - `sir_generator$new()` uses all the defaults.
 - `sir_generator$new(beta = 3e-4)` overrides just `beta`, without
   recompiling — the compiled C code is reused.
-- `m$contents()` shows the parameter values an instance is using.
+- `mod$contents()` shows the parameter values an instance is using.
 
 ## Changing parameters: scenarios from one compiled model
 
@@ -167,12 +167,12 @@ Scenarios are now cheap — pass new parameter values to `$new()`:
 #| fig-cap: "Peak prevalence falls as transmission slows"
 beta_values <- c(3e-4, 2e-4, 1.5e-4)
 
-plot(NULL, xlim = range(t), ylim = c(0, 350),
+plot(NULL, xlim = range(times), ylim = c(0, 350),
      xlab = "Time (days)", ylab = "Infectious (I)")
-for (b in beta_values) {
-  m <- sir_generator$new(beta = b)
-  lines(t, m$run(t)[, "I"], lwd = 2,
-        col = hcl.colors(length(beta_values), "Berlin")[which(beta_values == b)])
+for (beta_i in beta_values) {          # one run per beta value
+  mod <- sir_generator$new(beta = beta_i)
+  lines(times, mod$run(times)[, "I"], lwd = 2,
+        col = hcl.colors(length(beta_values), "Berlin")[which(beta_values == beta_i)])
 }
 legend("topright", legend = paste("beta =", beta_values,
                                   "(R0 =", beta_values * 1000 / 0.1, ")"),
@@ -206,16 +206,16 @@ sir_inc <- odin::odin({
   gamma <- user(0.1)
 })
 
-y <- sir_inc$new()$run(t)
+out <- sir_inc$new()$run(times)
 ```
 
 ```{r}
 #| fig-cap: "Cumulative incidence approaches the final epidemic size"
-plot(y[, "t"], y[, "cum_inc"], type = "l", lwd = 2,
+plot(out[, "t"], out[, "cum_inc"], type = "l", lwd = 2,
      xlab = "Time (days)", ylab = "Cumulative infections")
 ```
 
-The final value of `cum_inc` (≈ `r round(tail(y[, "cum_inc"], 1))` out of
+The final value of `cum_inc` (≈ `r round(tail(out[, "cum_inc"], 1))` out of
 1000) is the final size of the epidemic: about 80% of the population. The
 epidemic dies out before everyone is infected because once prevalence is
 high, each infectious person infects fewer than one susceptible on average.
@@ -233,11 +233,12 @@ as $R_0$ increases?
 #| code-summary: "Show solution"
 R0_targets <- c(1.2, 1.5, 2.5)
 cols <- hcl.colors(length(R0_targets), "Plasma")
-plot(NULL, xlim = range(t), ylim = c(0, 250),
+plot(NULL, xlim = range(times), ylim = c(0, 250),
      xlab = "Time (days)", ylab = "Infectious (I)")
 for (i in seq_along(R0_targets)) {
-  b <- R0_targets[i] * 0.1 / 1000     # R0 = beta * N / gamma
-  lines(t, sir_generator$new(beta = b)$run(t)[, "I"], col = cols[i], lwd = 2)
+  beta_i <- R0_targets[i] * 0.1 / 1000     # R0 = beta * N / gamma
+  lines(times, sir_generator$new(beta = beta_i)$run(times)[, "I"],
+        col = cols[i], lwd = 2)
 }
 legend("topright", legend = paste("R0 =", R0_targets),
        col = cols, lwd = 2, bty = "n")
@@ -256,8 +257,8 @@ What happens, and why does no epidemic occur?
 ```{r}
 #| code-fold: true
 #| code-summary: "Show solution"
-y <- sir_generator$new(beta = 8e-5)$run(t)
-matplot(y[, "t"], y[, c("S", "I", "R")], type = "l", lty = 1, lwd = 2,
+out <- sir_generator$new(beta = 8e-5)$run(times)
+matplot(out[, "t"], out[, c("S", "I", "R")], type = "l", lty = 1, lwd = 2,
         col = c("steelblue", "firebrick", "darkgreen"),
         xlab = "Time (days)", ylab = "Number of people")
 ```
