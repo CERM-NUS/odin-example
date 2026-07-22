@@ -57,3 +57,8 @@ slides/.quarto/
 
 /.quarto/
 .DS_Store
+
+# Personal learning materials: source is committed, rendered output stays local
+personal/*.html
+personal/.quarto/
+personal/*_files/
