@@ -135,13 +135,15 @@ sse <- function(beta) {
   sum((diff(out[, "cum_inc"]) - obs)^2)
 }
 
-fit <- optimize(sse, interval = c(5e-5, 5e-4), tol = 1e-8)
+## deliberately broad: R0 anywhere from 0.01 to 10
+fit <- optimize(sse, interval = c(1e-6, 1e-3), tol = 1e-8)
 fit$minimum   # fitted beta; truth is 2e-4
 ```
 
-Spot on. Watch the tolerance: `optimize()`'s default `tol` is about 1e-4
-— as big as beta itself — so without `tol = 1e-8` it "converges" to
-2.2e-4, a visibly wrong curve.
+Spot on, from an interval that knows nothing about the truth. But watch
+the tolerance: `optimize()`'s default `tol` is about 1e-4 — as big as
+beta itself — so without `tol = 1e-8` it stops at 2.2e-4, a visibly
+wrong curve.
 
 ## The fitted curve
 
@@ -161,6 +163,9 @@ legend("topright", legend = c("observed", "true", "fitted"),
 
 - `optimize()` is 1D only. For several parameters use
   `optim(pars, fn, method = "L-BFGS-B", lower = ..., upper = ...)`
+- Bounds can be genuinely broad (here beta in 1e-6 to 1e-3). You do not
+  need to know the neighbourhood of the truth — broad bounds plus
+  several starts
 - Parameters on very different scales (beta ~ 1e-4, a time ~ 40) confuse
   the default step sizes — set `control = list(parscale = ...)`
 - Fit to incidence, not prevalence: incidence is what surveillance
@@ -215,11 +220,28 @@ sse_step <- function(pars) {   # pars = c(beta1, beta2, t_change)
                       beta_vals = c(pars[1], pars[2], pars[2]))$run(week_times)
   sum((diff(out[, "cum_inc"]) - obs_step)^2)
 }
-fit_step <- optim(c(1.5e-4, 1.5e-4, 30), sse_step, method = "L-BFGS-B",
-                  lower = c(1e-5, 1e-5, 10), upper = c(5e-4, 5e-4, 120),
-                  control = list(parscale = c(1e-4, 1e-4, 10)))
+
+## broad bounds + a small grid of starts; keep the best final SSE
+starts <- rbind(c(1e-4, 1e-4, 25), c(8e-4, 8e-4, 120),
+                c(8e-4, 1e-5, 75), c(1e-5, 8e-4, 100))
+fits <- lapply(seq_len(nrow(starts)), function(i)
+  optim(starts[i, ], sse_step, method = "L-BFGS-B",
+        lower = c(1e-6, 1e-6, 5), upper = c(1e-3, 1e-3, 145),
+        control = list(parscale = c(1e-4, 1e-4, 10))))
+sapply(fits, "[[", "value")   # final SSE per start
+```
+
+## The winning start
+
+```{r}
+fit_step <- fits[[which.min(sapply(fits, "[[", "value"))]]
 fit_step$par   # truth: 2e-4, 1e-4, day 40
 ```
+
+Two of the four starts land in wrong minima with about 40x worse error.
+Comparing final SSE across starts — not trusting the first answer — is
+what saves you. You do not need to know the truth's neighbourhood; you
+need broad bounds and several starts.
 
 ## The fitted step
 
@@ -236,8 +258,7 @@ abline(v = fit_step$par[3], lty = 2)
 
 - Identifiability: the change time is only learnable if the curve visibly
   bends
-- Local optima are real: a start at `(3e-4, 5e-5, 80)` lands on a bound
-  with ~50x worse error — try several starts
+- Local optima are real — the grid of starts is the fix
 
 ## Part 4: seasonal beta in an SIRS model
 
@@ -291,16 +312,33 @@ sse_seas <- function(pars) {   # pars = c(beta0, amplitude, phase)
                            beta_vals = bb)$run(times_seas)
   sum((diff(out[, "cum_inc"]) - obs_seas)^2)
 }
-fit_seas <- optim(c(1.5e-4, 0.2, 60), sse_seas, method = "L-BFGS-B",
-                  lower = c(5e-5, 0, 0), upper = c(5e-4, 1, 365),
-                  control = list(parscale = c(1e-4, 0.1, 30)))
+
+## starts far from the truth, spread over phase
+starts <- rbind(c(5e-4, 0.5, 100), c(5e-4, 0.5, 180), c(5e-4, 0.5, 300))
+fits <- lapply(seq_len(nrow(starts)), function(i)
+  optim(starts[i, ], sse_seas, method = "L-BFGS-B",
+        lower = c(1e-6, 0, 0), upper = c(1e-3, 1, 365),
+        control = list(parscale = c(1e-4, 0.1, 30))))
+sapply(fits, "[[", "value")
+```
+
+## The winning start
+
+```{r}
+fit_seas <- fits[[which.min(sapply(fits, "[[", "value"))]]
 fit_seas$par   # truth: 2e-4, 0.3, 15
 ```
+
+Phase makes multi-start essential: one start drifts to the year boundary
+(phase 365), one falls into a flat-beta minimum (amplitude 0) — only one
+finds the truth. Phase is harder to fit than amplitude, because peak
+timing is only visible where incidence turns; more seasons of data helps
+more than denser sampling within one season.
 
 ## The fitted season
 
 ```{r}
-#| fig-height: 3.9
+#| fig-height: 4.2
 bb_fit <- fit_seas$par[1] *
   (1 + fit_seas$par[2] * cos(2 * pi * (beta_times - fit_seas$par[3]) / 365))
 out_fitseas <- sirs_seasonal$new(beta_times = beta_times,
@@ -310,26 +348,82 @@ plot(times_seas[-1], obs_seas, pch = 16, cex = 0.6,
 lines(times_seas[-1], diff(out_fitseas[, "cum_inc"]), col = "firebrick", lwd = 1.5)
 ```
 
-- Phase is harder to fit than amplitude — the peak timing is only visible
-  where incidence turns
-- More seasons of data helps more than denser sampling within one season
+## Part 5: a measured driver, made concrete
 
-## Part 5: a measured external driver
-
-No estimation needed — rescale the driver and pass it straight in:
+A weekly "mobility index" that dips around day 60 and recovers,
+normalised to mean 1; then beta(t) = beta0 x driver(t):
 
 ```{r}
-## stand-in for a measured series, e.g. a mobility index
-driver <- 0.8 + 0.2 * sin(2 * pi * seq(0, 365, by = 7) / 365)
-
-beta_times <- seq(0, 365, by = 7)
-beta_vals  <- 2e-4 * driver / mean(driver)   # keep average beta at 2e-4
-out_driver <- sir_step$new(beta_times = beta_times,
-                           beta_vals = beta_vals)$run(seq(0, 365, by = 7))
+#| fig-height: 4.0
+driver_times <- seq(0, 150, by = 7)
+dip <- 1 - 0.6 * exp(-((driver_times - 60)^2) / (2 * 20^2))  # dip at day 60
+driver <- dip / mean(dip)            # rescale to mean 1
+beta_vals <- 2e-4 * driver           # beta(t) = beta0 * driver(t)
+par(mfrow = c(1, 2))
+plot(driver_times, driver, type = "l", lwd = 2,
+     xlab = "Time (days)", ylab = "Mobility index")
+plot(driver_times, beta_vals, type = "l", lwd = 2, col = "firebrick",
+     xlab = "Time (days)", ylab = expression(beta(t)))
 ```
 
-Works for mobility, school terms, temperature — anything you trust as a
-covariate.
+## The inference variant: linear interpolation
+
+Same SIR, but beta follows the driver smoothly between the weekly points:
+
+```{r}
+sir_driver <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I
+  deriv(cum_inc) <- beta * S * I
+  beta <- interpolate(beta_times, beta_vals, "linear")
+  beta_times[] <- user()   # driver time points
+  beta_vals[] <- user()    # beta at each time point
+  dim(beta_times) <- user()
+  dim(beta_vals) <- user()
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  initial(cum_inc) <- 0
+  N0    <- user(1000)
+  I0    <- user(1)
+  gamma <- user(0.1)
+})
+```
+
+## Fitting the scaling of a known driver
+
+```{r}
+out_d <- sir_driver$new(beta_times = driver_times,
+                        beta_vals = 3e-4 * driver)$run(week_times)   # truth
+obs_driver <- rpois(length(week_times) - 1, diff(out_d[, "cum_inc"]))
+
+sse_driver <- function(beta0) {   # driver known; fit only its scale
+  out <- sir_driver$new(beta_times = driver_times,
+                        beta_vals = beta0 * driver)$run(week_times)
+  sum((diff(out[, "cum_inc"]) - obs_driver)^2)
+}
+fit_driver <- optimize(sse_driver, interval = c(1e-6, 1e-3), tol = 1e-8)
+fit_driver$minimum   # truth: 3e-4
+```
+
+## The fitted beta(t)
+
+```{r}
+#| fig-height: 3.9
+plot(driver_times, 3e-4 * driver, type = "l", lwd = 2,
+     xlab = "Time (days)", ylab = expression(beta(t)), ylim = c(0, 4e-4))
+lines(driver_times, fit_driver$minimum * driver, lwd = 2,
+      col = "firebrick", lty = 2)
+legend("topright", legend = c("true beta(t)", "fitted beta(t)"),
+       col = c("black", "firebrick"), lty = c(1, 2), lwd = 2, bty = "n")
+```
+
+- This is how covariates enter transmission models: known series in, one
+  coefficient out
+- Several covariates = one coefficient each, fitted together
+- Normalise or centre the covariate first, so the coefficient is
+  interpretable — here beta0 is the average beta
 
 ## Free-form beta(t): one value per knot
 
@@ -365,10 +459,11 @@ abline(h = 2e-4, col = "firebrick", lty = 2)
 ## Choosing an approach
 
 - **Regime change** (policy, behaviour shift): `"constant"` interpolation,
-  fit the levels and the change times
-- **Seasonal**: parametric cosine — fit beta0, amplitude, phase
-- **Measured driver**: rescale and pass the series as
-  `beta_times` / `beta_vals` — nothing to fit
+  fit the levels and the change times — broad bounds, several starts
+- **Seasonal**: parametric cosine — fit beta0, amplitude, phase; spread
+  the starts over phase
+- **Measured driver**: pass the series as `beta_times` / `beta_vals` and
+  fit a single scaling coefficient
 - **Unknown shape**: free knots plus a smoothing penalty; if you need
   intervals, move to odin2 + monty
 
