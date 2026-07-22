@@ -61,3 +61,16 @@ authorisation; afterwards `_publish.yml` makes it non-interactive.
 
 Note: the decks link back to `../index.html`, which resolves correctly on
 the published site but not when opening the local files directly.
+
+## Local full version (with personal notes)
+
+The repo also contains personal learning materials under `personal/`. These
+are committed to the repo but never published to the website. To build the
+book locally **with** the personal chapter and slides bundled, use the
+`local` Quarto profile:
+
+```sh
+QUARTO_PROFILE=local quarto render    # or: QUARTO_PROFILE=local quarto preview
+```
+
+Plain `quarto render` (and `./publish.sh`) builds the course-only version.

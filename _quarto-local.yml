@@ -1,0 +1,22 @@
+# Local profile: full version of the book, including personal notes.
+# Use: QUARTO_PROFILE=local quarto render   (or quarto preview)
+# The default profile (used by publish.sh) excludes all personal content.
+
+project:
+  render:
+    - index.qmd
+    - lectures/*.qmd
+    - slides.qmd
+    - personal/personal-notes.qmd
+
+book:
+  chapters:
+    - index.qmd
+    - lectures/01-odin-basics-sir.qmd
+    - lectures/02-extending-models.qmd
+    - slides.qmd
+    - personal/personal-notes.qmd
+
+resources:
+  - slides/*.html
+  - personal/*.html

@@ -1,0 +1,17 @@
+# Personal notes {.unnumbered}
+
+This chapter only exists in the **local** build of the book (rendered with
+`QUARTO_PROFILE=local`). It is not published to the course website.
+
+## Personal slides
+
+- [Estimating and specifying time-varying beta](time-varying-beta.html) —
+  least-squares fitting of a constant beta, a regime change, seasonal beta,
+  covariate rescaling, and free-form trends. Source:
+  `personal/time-varying-beta.qmd` in the repo.
+
+To re-render the personal slides after editing:
+
+```sh
+cd personal && quarto render time-varying-beta.qmd
+```
