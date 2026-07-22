@@ -1,0 +1,517 @@
+# Estimating time-varying beta {.unnumbered}
+
+This chapter is a set of personal working notes. It is built only in the
+local version of the book and is not published.
+
+```{r}
+#| include: false
+library(odin)
+set.seed(42)
+times <- seq(0, 150, by = 1)   # daily output over 150 days
+```
+
+## Three things named "beta"
+
+The word "beta" gets used for three different things, and keeping them
+apart is half the battle:
+
+- **A model parameter** — one number per run:
+  `mod <- sir_inc$new(beta = 2e-4)`.
+- **A scenario vector** — many runs, one per value:
+  `beta_values <- c(3e-4, 2e-4, 1.5e-4)`, then `lapply` over it.
+- **A paired time series** — `beta_times` and `beta_vals` fed to
+  `interpolate()`, so that beta varies *within* one run.
+
+This chapter is about the third: how to specify a time-varying beta, and
+how to estimate one from data. All the examples use the same closed SIR
+model, with one addition — a `cum_inc` compartment that accumulates new
+infections, because fitting needs incidence and surveillance reports
+incidence, not prevalence:
+
+```{r}
+sir_inc <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I
+  deriv(cum_inc) <- beta * S * I   # accumulates new infections
+
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  initial(cum_inc) <- 0
+
+  N0    <- user(1000)
+  I0    <- user(1)
+  beta  <- user(2e-4)
+  gamma <- user(0.1)
+})
+```
+
+For the time series we need a variant where beta comes from
+`interpolate()`. With `"constant"` interpolation beta holds each knot's
+value until the next knot, which is exactly a step:
+
+```{r}
+sir_step <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I
+  deriv(cum_inc) <- beta * S * I
+
+  beta <- interpolate(beta_times, beta_vals, "constant")
+
+  beta_times[] <- user()   # regime change times
+  beta_vals[] <- user()    # beta in each regime
+  dim(beta_times) <- user()
+  dim(beta_vals) <- user()
+
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  initial(cum_inc) <- 0
+
+  N0    <- user(1000)
+  I0    <- user(1)
+  gamma <- user(0.1)
+})
+```
+
+The three uses side by side:
+
+```{r}
+## (1) one constant beta per run
+out <- sir_inc$new(beta = 2e-4)$run(times)
+
+## (2) a scenario vector: one run per value
+beta_values <- c(3e-4, 2e-4, 1.5e-4)
+scenario_runs <- lapply(beta_values,
+                        function(beta_i) sir_inc$new(beta = beta_i)$run(times))
+
+## (3) a paired time series: beta varies within one run
+out_step <- sir_step$new(beta_times = c(0, 40, 150),
+                         beta_vals = c(2e-4, 1e-4, 1e-4))$run(times)
+```
+
+Use (3) is the one that looks least like the others, so it is worth
+seeing directly: the top panel is the beta(t) the solver actually sees,
+the bottom panel is the epidemic curve from the same single run.
+
+```{r}
+#| fig-cap: "One run with a time-varying beta: the step in beta (top) bends the incidence curve (bottom)"
+par(mfrow = c(2, 1), mar = c(3, 5, 1.5, 1) + 0.1)
+## top: the beta(t) the solver sees, built from the pair
+plot(c(0, 40, 150), c(2e-4, 1e-4, 1e-4), type = "s", lwd = 2.5,
+     xlab = "", ylab = expression(beta), xaxt = "n")
+abline(v = 40, lty = 2, col = "grey60")
+## bottom: incidence from the same single run
+plot(out_step[, "t"], out_step[, "I"], type = "l", lwd = 2.5,
+     col = "firebrick", xlab = "Time (days)", ylab = "Infectious (I)")
+abline(v = 40, lty = 2, col = "grey60")
+```
+
+`beta_times` says *when*, `beta_vals` says *what*. Everything else in
+this chapter is about working backwards from data to that pair.
+
+## Estimating a constant beta
+
+Start with the simplest estimation problem: beta does not vary at all,
+and we want to recover it from noisy weekly reports. Simulate the
+"observed" data by running the true model and adding Poisson noise to
+the weekly incidence:
+
+```{r}
+week_times <- seq(0, 150, by = 7)            # weekly output
+out <- sir_inc$new()$run(week_times)         # truth: beta = 2e-4
+inc_true <- diff(out[, "cum_inc"])           # true weekly incidence
+obs <- rpois(length(inc_true), inc_true)     # noisy "reported" data
+```
+
+```{r}
+#| fig-cap: "The fake surveillance data: noisy weekly incidence (points) around the truth (line)"
+plot(week_times[-1], obs, pch = 16,
+     xlab = "Time (days)", ylab = "Weekly new infections")
+lines(week_times[-1], inc_true, col = "firebrick", lwd = 2)
+```
+
+The error function runs the model at a candidate beta and sums the
+squared differences between modelled and observed weekly incidence:
+
+```{r}
+sse <- function(beta) {
+  out <- sir_inc$new(beta = beta)$run(week_times)
+  sum((diff(out[, "cum_inc"]) - obs)^2)
+}
+
+## deliberately broad: R0 anywhere from 0.01 to 10
+fit <- optimize(sse, interval = c(1e-6, 1e-3), tol = 1e-8)
+fit$minimum   # fitted beta; truth is 2e-4
+```
+
+The fitted value is about 2.00e-4 — spot on, from an interval that knows
+nothing about the truth. The `tol = 1e-8` is not decorative:
+`optimize()`'s default tolerance is about 1e-4, which is as big as beta
+itself. With the default, the algorithm stops once the bracket is
+smaller than that, "converging" to 2.2e-4 — a visibly wrong curve that
+peaks too early and too high. Whenever the parameter you are minimising
+over is much smaller than 1, set `tol` explicitly.
+
+```{r}
+#| fig-cap: "The fitted curve (red) is nearly indistinguishable from the truth (grey)"
+out_fit <- sir_inc$new(beta = fit$minimum)$run(week_times)
+plot(week_times[-1], obs, pch = 16,
+     xlab = "Time (days)", ylab = "Weekly new infections")
+lines(week_times[-1], inc_true, col = "grey60", lwd = 2)
+lines(week_times[-1], diff(out_fit[, "cum_inc"]), col = "firebrick", lwd = 2)
+legend("topright", legend = c("observed", "true", "fitted"),
+       col = c("black", "grey60", "firebrick"),
+       pch = c(16, NA, NA), lty = c(NA, 1, 1), bty = "n")
+```
+
+A few practical notes before moving to harder problems:
+
+- `optimize()` is 1D only. For several parameters use
+  `optim(pars, fn, method = "L-BFGS-B", lower = ..., upper = ...)`.
+- Bounds can be genuinely broad — here beta ranged over three orders of
+  magnitude. You do not need to know the neighbourhood of the truth; you
+  need broad bounds and, once there is more than one parameter, several
+  starts.
+- Parameters on very different scales (beta ~ 1e-4, a time ~ 40) confuse
+  the default finite-difference steps in `optim()` — set
+  `control = list(parscale = ...)` with a typical size for each
+  parameter.
+- Least squares on counts is a stand-in for a Poisson likelihood. It is
+  fine for exploring and for point estimates, but it gives no intervals.
+
+## Estimating a regime change
+
+Now let beta change once: transmission halves at day 40. The observed
+data come from the step model with `beta_times = c(0, 40, 150)` and
+`beta_vals = c(2e-4, 1e-4, 1e-4)`:
+
+```{r}
+out_step <- sir_step$new(beta_times = c(0, 40, 150),
+                         beta_vals = c(2e-4, 1e-4, 1e-4))$run(week_times)
+inc_step <- diff(out_step[, "cum_inc"])
+obs_step <- rpois(length(inc_step), inc_step)
+```
+
+```{r}
+#| fig-cap: "Weekly incidence when transmission halves at day 40 (dashed line)"
+plot(week_times[-1], obs_step, pch = 16,
+     xlab = "Time (days)", ylab = "Weekly new infections")
+abline(v = 40, lty = 2)
+```
+
+We fit three parameters: the two levels and the change time. The error
+function rebuilds the interpolate inputs from the parameters — note how
+`beta_times` is constructed around the candidate `t_change`:
+
+```{r}
+sse_step <- function(pars) {   # pars = c(beta1, beta2, t_change)
+  out <- sir_step$new(beta_times = c(0, pars[3], 150),
+                      beta_vals = c(pars[1], pars[2], pars[2]))$run(week_times)
+  sum((diff(out[, "cum_inc"]) - obs_step)^2)
+}
+```
+
+With three parameters the error surface has local minima, and with broad
+bounds a single start can land in one. The honest workflow is a small
+grid of starts spread across the range, keeping whichever end point has
+the lowest final error:
+
+```{r}
+starts <- rbind(c(1e-4, 1e-4, 25), c(8e-4, 8e-4, 120),
+                c(8e-4, 1e-5, 75), c(1e-5, 8e-4, 100))
+fits <- lapply(seq_len(nrow(starts)), function(i)
+  optim(starts[i, ], sse_step, method = "L-BFGS-B",
+        lower = c(1e-6, 1e-6, 5), upper = c(1e-3, 1e-3, 145),
+        control = list(parscale = c(1e-4, 1e-4, 10))))
+sapply(fits, "[[", "value")   # final SSE per start
+```
+
+Two of the four starts converge to the right place (final error about
+142); the other two land in wrong minima with about 40 times worse
+error. This is the local-optima lesson in its most useful form: the
+failures are not subtle — comparing final SSE across starts, rather than
+trusting the first answer, is what saves you.
+
+```{r}
+fit_step <- fits[[which.min(sapply(fits, "[[", "value"))]]
+fit_step$par   # truth: 2e-4, 1e-4, day 40
+```
+
+The best fit recovers beta1 = 2.003e-4, beta2 = 9.83e-5 and a change at
+day 42.4, against true values of 2e-4, 1e-4 and day 40. The change time
+is a little late because the weekly data only pin the bend down to
+within a reporting interval or so.
+
+```{r}
+#| fig-cap: "Fitted step model (line) against the noisy data; dashed line at the fitted change time"
+out_fitstep <- sir_step$new(
+  beta_times = c(0, fit_step$par[3], 150),
+  beta_vals = c(fit_step$par[1], fit_step$par[2], fit_step$par[2]))$run(week_times)
+plot(week_times[-1], obs_step, pch = 16,
+     xlab = "Time (days)", ylab = "Weekly new infections")
+lines(week_times[-1], diff(out_fitstep[, "cum_inc"]), col = "firebrick", lwd = 2)
+abline(v = fit_step$par[3], lty = 2)
+```
+
+One caveat on identifiability: the change time is only learnable if the
+curve visibly bends. If the two regimes produce similar incidence over
+the observed window, the data cannot say when the change happened — no
+optimizer can fix that.
+
+## Estimating seasonal beta
+
+For a driver that varies smoothly, like seasonality, a step is the wrong
+shape. And a practical point first: in the closed SIR a single wave
+infects most of the population and then transmission is over — there is
+nothing left for seasonality to act on. So for this example we let
+immunity wane (the SIRS model, mean immunity 90 days) and drive beta
+with a cosine, interpolated linearly between monthly knots:
+
+```{r}
+sirs_seasonal <- odin::odin({
+  deriv(S) <- -beta * S * I + omega * R
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I - omega * R
+  deriv(cum_inc) <- beta * S * I
+
+  beta <- interpolate(beta_times, beta_vals, "linear")
+
+  beta_times[] <- user()
+  beta_vals[] <- user()
+  dim(beta_times) <- user()
+  dim(beta_vals) <- user()
+
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  initial(cum_inc) <- 0
+
+  N0    <- user(1000)
+  I0    <- user(1)
+  gamma <- user(0.1)
+  omega <- user(1 / 90)
+})
+```
+
+The observed data: two years of weekly reports, with transmission
+peaking in mid-January (phase = day 15) at 30% amplitude:
+
+```{r}
+beta_times <- seq(0, 730, by = 365 / 12)   # monthly knots, 2 years
+beta_vals  <- 2e-4 * (1 + 0.3 * cos(2 * pi * (beta_times - 15) / 365))
+times_seas <- seq(0, 730, by = 7)          # weekly output
+out_seas <- sirs_seasonal$new(beta_times = beta_times,
+                              beta_vals = beta_vals)$run(times_seas)
+obs_seas <- rpois(length(times_seas) - 1, diff(out_seas[, "cum_inc"]))
+```
+
+```{r}
+#| fig-cap: "Two years of noisy weekly incidence under seasonal forcing"
+plot(times_seas[-1], obs_seas, pch = 16, cex = 0.6,
+     xlab = "Time (days)", ylab = "Weekly new infections")
+```
+
+The error function constructs the seasonal beta(t) from three
+parameters — baseline, amplitude and phase — on the same monthly knots:
+
+```{r}
+sse_seas <- function(pars) {   # pars = c(beta0, amplitude, phase)
+  bb <- pars[1] * (1 + pars[2] * cos(2 * pi * (beta_times - pars[3]) / 365))
+  out <- sirs_seasonal$new(beta_times = beta_times,
+                           beta_vals = bb)$run(times_seas)
+  sum((diff(out[, "cum_inc"]) - obs_seas)^2)
+}
+```
+
+Phase is the hardest of the three to fit: the timing of the peak is only
+visible where incidence turns, and the error surface has a ridge with
+poor minima on both sides. Three starts, all far from the truth and
+spread over phase:
+
+```{r}
+starts <- rbind(c(5e-4, 0.5, 100), c(5e-4, 0.5, 180), c(5e-4, 0.5, 300))
+fits <- lapply(seq_len(nrow(starts)), function(i)
+  optim(starts[i, ], sse_seas, method = "L-BFGS-B",
+        lower = c(1e-6, 0, 0), upper = c(1e-3, 1, 365),
+        control = list(parscale = c(1e-4, 0.1, 30))))
+sapply(fits, "[[", "value")
+```
+
+The three outcomes are instructive. The start at phase 100 drifts to the
+year boundary (phase 365, error about 8200); the start at phase 180
+falls into a flat-beta minimum with amplitude 0 (error about 64000 —
+the optimizer decides there is no seasonality at all); only the start at
+phase 300 finds the truth. Best of the grid:
+
+```{r}
+fit_seas <- fits[[which.min(sapply(fits, "[[", "value"))]]
+fit_seas$par   # truth: 2e-4, 0.3, 15
+```
+
+The winning fit recovers beta0 = 2.0026e-4, amplitude 0.300 and phase
+15.4 days, against true values of 2e-4, 0.3 and 15. When the answer
+matters, more seasons of data help more than denser sampling within one
+season — each extra winter is another vote for where the peak sits.
+
+```{r}
+#| fig-cap: "The fitted seasonal model (line) against the noisy data"
+bb_fit <- fit_seas$par[1] *
+  (1 + fit_seas$par[2] * cos(2 * pi * (beta_times - fit_seas$par[3]) / 365))
+out_fitseas <- sirs_seasonal$new(beta_times = beta_times,
+                                 beta_vals = bb_fit)$run(times_seas)
+plot(times_seas[-1], obs_seas, pch = 16, cex = 0.6,
+     xlab = "Time (days)", ylab = "Weekly new infections")
+lines(times_seas[-1], diff(out_fitseas[, "cum_inc"]), col = "firebrick", lwd = 1.5)
+```
+
+## Covariate-driven beta
+
+Sometimes the shape of beta(t) is not estimated at all — it is measured.
+Mobility indices, school term calendars and temperature series all enter
+transmission models this way: as a known covariate that scales beta.
+Make a concrete example — a weekly "mobility index" that dips around
+day 60 and recovers, normalised to mean 1, so that
+beta(t) = beta0 x driver(t):
+
+```{r}
+#| fig-cap: "Left: the driver series (mean 1). Right: the resulting beta(t) with beta0 = 2e-4."
+driver_times <- seq(0, 150, by = 7)
+dip <- 1 - 0.6 * exp(-((driver_times - 60)^2) / (2 * 20^2))  # dip at day 60
+driver <- dip / mean(dip)            # rescale to mean 1
+beta_vals <- 2e-4 * driver           # beta(t) = beta0 * driver(t)
+par(mfrow = c(1, 2))
+plot(driver_times, driver, type = "l", lwd = 2,
+     xlab = "Time (days)", ylab = "Mobility index")
+plot(driver_times, beta_vals, type = "l", lwd = 2, col = "firebrick",
+     xlab = "Time (days)", ylab = expression(beta(t)))
+```
+
+Passing `driver_times` and `beta_vals` to the model is all the
+specification takes. The interesting inference question is the
+rescaling: if the driver's *shape* is trusted but its *scale* is not,
+fit beta0. For that we use a linear-interpolation variant of the SIR, so
+beta follows the driver smoothly between the weekly points:
+
+```{r}
+sir_driver <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(I) <- beta * S * I - gamma * I
+  deriv(R) <- gamma * I
+  deriv(cum_inc) <- beta * S * I
+
+  beta <- interpolate(beta_times, beta_vals, "linear")
+
+  beta_times[] <- user()   # driver time points
+  beta_vals[] <- user()    # beta at each time point
+  dim(beta_times) <- user()
+  dim(beta_vals) <- user()
+
+  initial(S) <- N0 - I0
+  initial(I) <- I0
+  initial(R) <- 0
+  initial(cum_inc) <- 0
+
+  N0    <- user(1000)
+  I0    <- user(1)
+  gamma <- user(0.1)
+})
+```
+
+Simulate observed data with a true scaling of 3e-4, then fit only
+beta0, treating the driver as a known covariate inside the error
+function:
+
+```{r}
+out_d <- sir_driver$new(beta_times = driver_times,
+                        beta_vals = 3e-4 * driver)$run(week_times)   # truth
+obs_driver <- rpois(length(week_times) - 1, diff(out_d[, "cum_inc"]))
+
+sse_driver <- function(beta0) {   # driver known; fit only its scale
+  out <- sir_driver$new(beta_times = driver_times,
+                        beta_vals = beta0 * driver)$run(week_times)
+  sum((diff(out[, "cum_inc"]) - obs_driver)^2)
+}
+fit_driver <- optimize(sse_driver, interval = c(1e-6, 1e-3), tol = 1e-8)
+fit_driver$minimum   # truth: 3e-4
+```
+
+The fitted scaling is 2.99e-4 against a truth of 3e-4, and the fitted
+beta(t) lies on top of the true one:
+
+```{r}
+#| fig-cap: "True beta(t) (solid) and the fitted scaling (dashed) — nearly identical"
+plot(driver_times, 3e-4 * driver, type = "l", lwd = 2,
+     xlab = "Time (days)", ylab = expression(beta(t)), ylim = c(0, 4e-4))
+lines(driver_times, fit_driver$minimum * driver, lwd = 2,
+      col = "firebrick", lty = 2)
+legend("topright", legend = c("true beta(t)", "fitted beta(t)"),
+       col = c("black", "firebrick"), lty = c(1, 2), lwd = 2, bty = "n")
+```
+
+This pattern generalises directly:
+
+- Covariates enter transmission models exactly like this: known series
+  in, one coefficient out.
+- With several covariates, fit one coefficient each, all together.
+- Normalise or centre each covariate first so the coefficients are
+  interpretable — here beta0 is the average beta because the driver has
+  mean 1.
+
+## Free-form beta(t)
+
+The most flexible option is to give up on a parametric shape and
+estimate beta at a set of knots directly — here six, on the constant-beta
+data from the first example, where the truth is a flat line:
+
+```{r}
+knot_times <- seq(0, 150, by = 30)   # six free betas on the Part-2 data
+sse_free <- function(betas) {
+  out <- sir_step$new(beta_times = knot_times,
+                      beta_vals = betas)$run(week_times)
+  sum((diff(out[, "cum_inc"]) - obs)^2)
+}
+fit_free <- optim(rep(2e-4, 6), sse_free, method = "L-BFGS-B",
+                  lower = rep(0, 6), upper = rep(5e-4, 6),
+                  control = list(parscale = rep(1e-4, 6), maxit = 2000))
+fit_free$par   # truth is a flat 2e-4
+```
+
+```{r}
+#| fig-cap: "Six freely fitted betas (step line) around the true constant value (dashed) — the wiggle is overfitting"
+plot(knot_times, fit_free$par, type = "s", lwd = 2, ylim = c(0, 4e-4),
+     xlab = "Time (days)", ylab = expression(beta), xlim = c(0, 150))
+points(knot_times, fit_free$par, pch = 16)
+abline(h = 2e-4, col = "firebrick", lty = 2)
+```
+
+The fitted values range from 1.96e-4 to 2.19e-4: the truth is flat, but
+the fit wiggles by about 10% in both directions, chasing noise. With one
+parameter per knot, the model has enough freedom to fit the noise as
+well as the signal. The standard fix is to penalise roughness — add a
+term like `lambda * sum(diff(betas)^2)` to the error so that
+neighbouring betas are pulled towards each other. Once you want proper
+uncertainty intervals on a flexible beta(t), least squares has run out
+of road: that is the point to move to odin2 + monty, where priors do the
+smoothing and you get full Bayesian inference.
+
+## Choosing an approach
+
+- **Regime change** (policy, behaviour shift): `"constant"`
+  interpolation, fit the levels and the change times — broad bounds,
+  several starts.
+- **Seasonal**: parametric cosine — fit beta0, amplitude and phase;
+  spread the starts over phase.
+- **Measured driver**: pass the series as `beta_times` / `beta_vals`
+  and fit a single scaling coefficient.
+- **Unknown shape**: free knots plus a smoothing penalty; if you need
+  intervals, move to odin2 + monty.
+
+In every case: plot the series you feed in, and plot the fit against the
+data before believing any number.
+
+---
+
+[Slides: estimating and specifying time-varying beta](time-varying-beta.html)

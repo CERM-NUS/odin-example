@@ -7,7 +7,7 @@ project:
     - index.qmd
     - lectures/*.qmd
     - slides.qmd
-    - personal/personal-notes.qmd
+    - personal/estimating-beta.qmd
 
 book:
   chapters:
@@ -15,7 +15,7 @@ book:
     - lectures/01-odin-basics-sir.qmd
     - lectures/02-extending-models.qmd
     - slides.qmd
-    - personal/personal-notes.qmd
+    - personal/estimating-beta.qmd
 
 resources:
   - slides/*.html
