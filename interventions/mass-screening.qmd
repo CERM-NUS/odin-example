@@ -45,12 +45,14 @@ outright.
 
 Same pattern as school closure: one generator with a switch at
 `screen_time`, cumulative incidence `inc` tracked for daily case counts.
+We seed 1000 infectious people and run 300 days, so every scenario shows
+its full course — rise, peak and decline to stability.
 
 ```{r}
 library(odin)
 library(tidyverse)
 
-times <- seq(0, 150, by = 1)   # daily output over 150 days
+times <- seq(0, 300, by = 1)   # daily output over 300 days
 
 seirq <- odin::odin({
   deriv(S) <- -beta * S * I
@@ -73,7 +75,7 @@ seirq <- odin::odin({
   initial(inc) <- 0
 
   N_ini <- user(5700000)
-  I_ini <- user(1)
+  I_ini <- user(1000)   # start with 1000 infectious, so dynamics are visible
 
   beta        <- user(8.77e-8)  # R0 = beta * N / gamma = 2.5
   gamma       <- user(0.2)      # infectious period 5 days
@@ -139,11 +141,11 @@ df_day0 %>%
 ```
 
 With screening from day 0 the effective reproduction number falls from 2.5 to
-about 1.4 — the epidemic still grows, but far more slowly. By day 150 there
-are roughly 200,000 infections instead of 5 million, and prevalence is still
-climbing gently where the unscreened epidemic has already peaked and
-collapsed. Note the isolated compartment $Q$ filling up as cases are
-detected.
+about 1.4 — the epidemic still grows, but far more slowly. The peak arrives
+around day 94 at roughly 140,000 infectious, versus 940,000 on day 52 with
+no screening, and the final size falls from 5.1 to 2.9 million. Note the
+isolated compartment $Q$ swelling as cases are detected, then emptying as
+they leave quarantine.
 
 ## Part 2: screening from day 30
 
@@ -200,10 +202,11 @@ df_mid %>%
   theme(legend.position = "bottom")
 ```
 
-Once screening switches on, growth slows visibly — detected cases accumulate
-in $Q$, where they recover without transmitting — but with $\delta = 0.1$ the
-effective $R$ stays above 1, so incidence keeps rising, only much more
-slowly. Faster detection (shorter $1/\delta$) is what would bend the curve
-downwards. Compare school closure: both interventions here leave $R > 1$ and
-so mainly buy time; stopping an epidemic outright requires pushing the
+Once screening switches on, growth slows visibly — the peak is cut from
+940,000 to about 205,000 and the final size from 5.1 to 3.1 million — but
+with $\delta = 0.1$ the effective $R$ stays above 1, so the epidemic still
+runs its course before settling. Faster detection (shorter $1/\delta$,
+beyond about $\delta = 0.17$) is what would bend the curve down and stop it
+outright. Compare school closure: both interventions here leave $R > 1$ and
+so buy time and lower the peak; stopping an epidemic requires pushing the
 effective $R$ below 1.
