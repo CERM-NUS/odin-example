@@ -6,6 +6,7 @@ project:
   render:
     - index.qmd
     - lectures/*.qmd
+    - interventions/*.qmd
     - slides.qmd
     - personal/estimating-beta.qmd
 
@@ -14,6 +15,8 @@ book:
     - index.qmd
     - lectures/01-odin-basics-sir.qmd
     - lectures/02-extending-models.qmd
+    - interventions/school-closure.qmd
+    - interventions/mass-screening.qmd
     - slides.qmd
     - personal/estimating-beta.qmd
 

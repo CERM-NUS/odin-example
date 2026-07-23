@@ -1,0 +1,198 @@
+---
+knitr:
+  opts_chunk:
+    fig-width: 10
+    fig-asp: 0.55
+---
+
+# Interventions: mass screening {#sec-mass-screening}
+
+**Goal:** add test-and-isolate to the SEIR model and compare epidemic
+trajectories with no screening vs mass screening starting at different times.
+
+## The model
+
+Start from the SEIR model and add a quarantine compartment $Q$. Mass
+screening finds infected people — both exposed ($E$) and infectious ($I$) —
+at rate $\delta$ and isolates them in $Q$, where they no longer transmit.
+Isolated people leave quarantine at rate $\varepsilon$:
+
+$$
+\frac{dS}{dt} = -\beta S I, \qquad
+\frac{dE}{dt} = \beta S I - \lambda E - \delta E,
+$$
+
+$$
+\frac{dI}{dt} = \lambda E - \gamma I - \delta I, \qquad
+\frac{dQ}{dt} = \delta E + \delta I - \varepsilon Q, \qquad
+\frac{dR}{dt} = \gamma I + \varepsilon Q.
+$$
+
+Screening is off before `screen_time` ($\delta = 0$) and on afterwards.
+Because screening shortens the time spent infectious and intercepts a
+fraction $\lambda/(\lambda + \delta)$ of people before they even become
+infectious, the effective reproduction number falls from
+$\beta N/\gamma$ to
+$\frac{\lambda}{\lambda + \delta}\,\frac{\beta N}{\gamma + \delta}$.
+
+## odin implementation
+
+Same pattern as school closure: one generator with a switch at
+`screen_time`, cumulative incidence `inc` tracked for daily case counts.
+
+```{r}
+library(odin)
+library(tidyverse)
+
+times <- seq(0, 150, by = 1)   # daily output over 150 days
+
+seirq <- odin::odin({
+  deriv(S) <- -beta * S * I
+  deriv(E) <-  beta * S * I - lambda * E - delta * E
+  deriv(I) <-  lambda * E - gamma * I - delta * I
+  deriv(Q) <-  delta * E + delta * I - epsilon * Q
+  deriv(R) <-  gamma * I + epsilon * Q
+
+  # cumulative incidence (differenced below to get daily cases)
+  deriv(inc) <- beta * S * I
+
+  # no screening before screen_time, screening at rate delta after
+  delta <- if (t < screen_time) 0 else screen_rate
+
+  initial(S)   <- N_ini - I_ini
+  initial(E)   <- 0
+  initial(I)   <- I_ini
+  initial(Q)   <- 0
+  initial(R)   <- 0
+  initial(inc) <- 0
+
+  N_ini <- user(5700000)
+  I_ini <- user(1)
+
+  beta        <- user(8.77e-8)  # R0 = beta * N / gamma = 2.5
+  gamma       <- user(0.2)      # infectious period 5 days
+  lambda      <- user(0.5)      # latent period 2 days
+  screen_rate <- user(0.5)      # detected & isolated in ~2 days once on
+  epsilon     <- user(0.2)      # 5 days in quarantine
+  screen_time <- user(1e6)      # default: never screen
+})
+
+run_scenario <- function(screen_time, label) {
+  seirq$new(screen_time = screen_time)$run(times) %>%
+    as.data.frame() %>%
+    mutate(scenario = label)
+}
+```
+
+## Part 1: screening from day 0
+
+Compare the uncontrolled epidemic against one where mass screening runs from
+the very start:
+
+```{r}
+df_day0 <- bind_rows(
+  run_scenario(1e6, "Never"),
+  run_scenario(0,   "From day 0")
+) %>%
+  mutate(scenario = factor(scenario,
+                           levels = c("Never", "From day 0")))
+```
+
+```{r}
+#| fig-cap: "Daily incidence, no screening vs screening from day 0"
+df_day0 %>%
+  group_by(scenario) %>%
+  mutate(new_cases = c(NA, diff(inc))) %>%
+  ungroup() %>%
+  filter(t > 0) %>%
+  ggplot(aes(x = t, y = new_cases, linetype = scenario)) +
+  geom_line(linewidth = 1, colour = "#D55E00") +
+  xlab("Time (days)") +
+  ylab("Daily new infections\n") +
+  labs(linetype = "Screening") +
+  theme_classic(base_size = 20) +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+#| fig-cap: "Total S, E, I, Q, R, no screening vs screening from day 0"
+df_day0 %>%
+  pivot_longer(c(S, E, I, Q, R), names_to = "compartment",
+               values_to = "people") %>%
+  ggplot(aes(x = t, y = people, colour = compartment, linetype = scenario)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = c("S" = "#0072B2", "E" = "#E69F00",
+                                 "I" = "#D55E00", "Q" = "#CC79A7",
+                                 "R" = "#009E73"),
+                      limits = c("S", "E", "I", "Q", "R")) +
+  xlab("Time (days)") +
+  ylab("Total number of individuals\n") +
+  labs(colour = NULL, linetype = "Screening") +
+  theme_classic(base_size = 20) +
+  theme(legend.position = "bottom")
+```
+
+With screening from day 0 the effective reproduction number falls from 2.5 to
+$\frac{0.5}{0.5 + 0.5}\times\frac{0.5}{0.2 + 0.5} \approx 0.36$ — the
+epidemic never takes off.
+
+## Part 2: screening from day 30
+
+In practice screening ramps up after the epidemic is underway. Here it starts
+on day 30, compared with never screening:
+
+```{r}
+screen_day <- 30
+
+df_mid <- bind_rows(
+  run_scenario(1e6, "Never"),
+  run_scenario(screen_day, paste0("From day ", screen_day))
+) %>%
+  mutate(scenario = factor(scenario,
+                           levels = c("Never",
+                                      paste0("From day ", screen_day))))
+```
+
+```{r}
+#| fig-cap: "Daily incidence, no screening vs screening from day 30"
+df_mid %>%
+  group_by(scenario) %>%
+  mutate(new_cases = c(NA, diff(inc))) %>%
+  ungroup() %>%
+  filter(t > 0) %>%
+  ggplot(aes(x = t, y = new_cases, linetype = scenario)) +
+  geom_line(linewidth = 1, colour = "#D55E00") +
+  geom_vline(xintercept = screen_day, linetype = "dotted", colour = "grey50",
+             linewidth = 1) +
+  xlab("Time (days)") +
+  ylab("Daily new infections\n") +
+  labs(linetype = "Screening") +
+  theme_classic(base_size = 20) +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+#| fig-cap: "Total S, E, I, Q, R, no screening vs screening from day 30"
+df_mid %>%
+  pivot_longer(c(S, E, I, Q, R), names_to = "compartment",
+               values_to = "people") %>%
+  ggplot(aes(x = t, y = people, colour = compartment, linetype = scenario)) +
+  geom_line(linewidth = 1) +
+  geom_vline(xintercept = screen_day, linetype = "dotted", colour = "grey50",
+             linewidth = 1) +
+  scale_colour_manual(values = c("S" = "#0072B2", "E" = "#E69F00",
+                                 "I" = "#D55E00", "Q" = "#CC79A7",
+                                 "R" = "#009E73"),
+                      limits = c("S", "E", "I", "Q", "R")) +
+  xlab("Time (days)") +
+  ylab("Total number of individuals\n") +
+  labs(colour = NULL, linetype = "Screening") +
+  theme_classic(base_size = 20) +
+  theme(legend.position = "bottom")
+```
+
+Once screening switches on, $E$ and $I$ fall almost immediately — detected
+cases accumulate in $Q$, where they recover without transmitting. Note the
+contrast with school closure: screening removes people from the infectious
+pool directly, so it bends the curve down even after the peak, while a
+mixing reduction only slows new infections.
