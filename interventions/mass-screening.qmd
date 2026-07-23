@@ -34,6 +34,12 @@ fraction $\lambda/(\lambda + \delta)$ of people before they even become
 infectious, the effective reproduction number falls from
 $\beta N/\gamma$ to
 $\frac{\lambda}{\lambda + \delta}\,\frac{\beta N}{\gamma + \delta}$.
+With the values below ($\delta = 0.1$, i.e. detection and isolation about
+10 days after infection) this gives
+$\frac{0.5}{0.6}\times\frac{0.5}{0.3} \approx 1.4$ — slower growth, but
+still above 1. Detection faster than about every 6 days
+($\delta \gtrsim 0.17$) would push it below 1 and stop the epidemic
+outright.
 
 ## odin implementation
 
@@ -72,7 +78,7 @@ seirq <- odin::odin({
   beta        <- user(8.77e-8)  # R0 = beta * N / gamma = 2.5
   gamma       <- user(0.2)      # infectious period 5 days
   lambda      <- user(0.5)      # latent period 2 days
-  screen_rate <- user(0.5)      # detected & isolated in ~2 days once on
+  screen_rate <- user(0.1)      # detected & isolated in ~10 days once on
   epsilon     <- user(0.2)      # 5 days in quarantine
   screen_time <- user(1e6)      # default: never screen
 })
@@ -133,8 +139,11 @@ df_day0 %>%
 ```
 
 With screening from day 0 the effective reproduction number falls from 2.5 to
-$\frac{0.5}{0.5 + 0.5}\times\frac{0.5}{0.2 + 0.5} \approx 0.36$ — the
-epidemic never takes off.
+about 1.4 — the epidemic still grows, but far more slowly. By day 150 there
+are roughly 200,000 infections instead of 5 million, and prevalence is still
+climbing gently where the unscreened epidemic has already peaked and
+collapsed. Note the isolated compartment $Q$ filling up as cases are
+detected.
 
 ## Part 2: screening from day 30
 
@@ -191,8 +200,10 @@ df_mid %>%
   theme(legend.position = "bottom")
 ```
 
-Once screening switches on, $E$ and $I$ fall almost immediately — detected
-cases accumulate in $Q$, where they recover without transmitting. Note the
-contrast with school closure: screening removes people from the infectious
-pool directly, so it bends the curve down even after the peak, while a
-mixing reduction only slows new infections.
+Once screening switches on, growth slows visibly — detected cases accumulate
+in $Q$, where they recover without transmitting — but with $\delta = 0.1$ the
+effective $R$ stays above 1, so incidence keeps rising, only much more
+slowly. Faster detection (shorter $1/\delta$) is what would bend the curve
+downwards. Compare school closure: both interventions here leave $R > 1$ and
+so mainly buy time; stopping an epidemic outright requires pushing the
+effective $R$ below 1.
