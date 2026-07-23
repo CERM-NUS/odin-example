@@ -11,6 +11,11 @@ format:
 echo: true
 ---
 
+```{r}
+#| include: false
+library(tidyverse)
+```
+
 ## B3_1: odin basics & the SIR model {.title-slide}
 
 Coding compartmental models with R and odin
@@ -157,16 +162,18 @@ head(out)
 `out` is a data frame with one column per compartment plus time `t`, one row
 per requested time point.
 
-## Plotting with base R
+## Plotting with ggplot2
 
 ```{r}
 #| fig-height: 5.2
-matplot(out[, "t"], out[, c("S", "I", "R")],
-        type = "l", lty = 1, lwd = 2,
-        col = c("steelblue", "firebrick", "darkgreen"),
-        xlab = "Time (days)", ylab = "Number of people")
-legend("right", legend = c("S", "I", "R"), lwd = 2,
-       col = c("steelblue", "firebrick", "darkgreen"), bty = "n")
+as.data.frame(out) |>
+  pivot_longer(c(S, I, R), names_to = "compartment", values_to = "n") |>
+  ggplot(aes(t, n, colour = compartment)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = c(S = "#0072B2", I = "#D55E00", R = "#009E73")) +
+  labs(x = "Time (days)", y = "Number of people", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Here $R_0 = \beta N / \gamma = 2$.
@@ -221,14 +228,21 @@ Compilation happens once; every scenario after that is just `$new()` and
 ```{r}
 #| fig-height: 5.2
 cols <- hcl.colors(length(beta_values), "Berlin")
-plot(NULL, xlim = range(times), ylim = c(0, 350),
-     xlab = "Time (days)", ylab = "Infectious (I)")
-for (i in seq_along(beta_values)) {
-  lines(times, scenario_runs[[i]][, "I"], lwd = 2, col = cols[i])
-}
-legend("topright", legend = paste("beta =", beta_values,
-                                  "(R0 =", beta_values * 1000 / 0.1, ")"),
-       col = cols, lwd = 2, bty = "n")
+scenario_labels <- paste("beta =", beta_values,
+                         "(R0 =", beta_values * 1000 / 0.1, ")")
+scenario_data <- bind_rows(lapply(seq_along(beta_values), function(i) {
+  as.data.frame(scenario_runs[[i]]) |>
+    mutate(scenario = scenario_labels[i])
+})) |>
+  mutate(scenario = factor(scenario, levels = scenario_labels))
+
+ggplot(scenario_data, aes(t, I, colour = scenario)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = setNames(cols, scenario_labels)) +
+  coord_cartesian(ylim = c(0, 350)) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Peak prevalence falls as transmission slows.
@@ -267,8 +281,11 @@ sir_inc <- odin::odin({
 ```{r}
 #| fig-height: 5.0
 out <- sir_inc$new()$run(times)
-plot(out[, "t"], out[, "cum_inc"], type = "l", lwd = 2,
-     xlab = "Time (days)", ylab = "Cumulative infections")
+as.data.frame(out) |>
+  ggplot(aes(t, cum_inc)) +
+  geom_line(linewidth = 1) +
+  labs(x = "Time (days)", y = "Cumulative infections") +
+  theme_classic(base_size = 16)
 ```
 
 The final value of `cum_inc` is the final size of the epidemic: about 80%

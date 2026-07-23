@@ -6,6 +6,8 @@ local version of the book and is not published.
 ```{r}
 #| include: false
 library(odin)
+library(tidyverse)
+library(patchwork)
 set.seed(42)
 times <- seq(0, 150, by = 1)   # daily output over 150 days
 ```
@@ -98,15 +100,25 @@ the bottom panel is the epidemic curve from the same single run.
 
 ```{r}
 #| fig-cap: "One run with a time-varying beta: the step in beta (top) bends the incidence curve (bottom)"
-par(mfrow = c(2, 1), mar = c(3, 5, 1.5, 1) + 0.1)
 ## top: the beta(t) the solver sees, built from the pair
-plot(c(0, 40, 150), c(2e-4, 1e-4, 1e-4), type = "s", lwd = 2.5,
-     xlab = "", ylab = expression(beta), xaxt = "n")
-abline(v = 40, lty = 2, col = "grey60")
+beta_df <- data.frame(time = c(0, 40, 150), beta = c(2e-4, 1e-4, 1e-4))
+inc_df <- as.data.frame(out_step)
+
+p1 <- ggplot(beta_df, aes(x = time, y = beta)) +
+  geom_step(linewidth = 1.2) +
+  geom_vline(xintercept = 40, linetype = "dashed", colour = "grey60") +
+  labs(x = NULL, y = expression(beta)) +
+  theme_classic(base_size = 16) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
 ## bottom: incidence from the same single run
-plot(out_step[, "t"], out_step[, "I"], type = "l", lwd = 2.5,
-     col = "firebrick", xlab = "Time (days)", ylab = "Infectious (I)")
-abline(v = 40, lty = 2, col = "grey60")
+p2 <- ggplot(inc_df, aes(x = t, y = I)) +
+  geom_line(linewidth = 1.2, colour = "#D55E00") +
+  geom_vline(xintercept = 40, linetype = "dashed", colour = "grey60") +
+  labs(x = "Time (days)", y = "Infectious (I)") +
+  theme_classic(base_size = 16)
+
+p1 / p2
 ```
 
 `beta_times` says *when*, `beta_vals` says *what*. Everything else in
@@ -128,9 +140,12 @@ obs <- rpois(length(inc_true), inc_true)     # noisy "reported" data
 
 ```{r}
 #| fig-cap: "The fake surveillance data: noisy weekly incidence (points) around the truth (line)"
-plot(week_times[-1], obs, pch = 16,
-     xlab = "Time (days)", ylab = "Weekly new infections")
-lines(week_times[-1], inc_true, col = "firebrick", lwd = 2)
+surv_df <- data.frame(time = week_times[-1], observed = obs, true = inc_true)
+ggplot(surv_df, aes(x = time)) +
+  geom_point(aes(y = observed), shape = 16) +
+  geom_line(aes(y = true), colour = "#D55E00", linewidth = 1) +
+  labs(x = "Time (days)", y = "Weekly new infections") +
+  theme_classic(base_size = 16)
 ```
 
 The error function runs the model at a candidate beta and sums the
@@ -158,13 +173,18 @@ over is much smaller than 1, set `tol` explicitly.
 ```{r}
 #| fig-cap: "The fitted curve (red) is nearly indistinguishable from the truth (grey)"
 out_fit <- sir_inc$new(beta = fit$minimum)$run(week_times)
-plot(week_times[-1], obs, pch = 16,
-     xlab = "Time (days)", ylab = "Weekly new infections")
-lines(week_times[-1], inc_true, col = "grey60", lwd = 2)
-lines(week_times[-1], diff(out_fit[, "cum_inc"]), col = "firebrick", lwd = 2)
-legend("topright", legend = c("observed", "true", "fitted"),
-       col = c("black", "grey60", "firebrick"),
-       pch = c(16, NA, NA), lty = c(NA, 1, 1), bty = "n")
+fit_df <- data.frame(time = week_times[-1], observed = obs, true = inc_true,
+                     fitted = diff(out_fit[, "cum_inc"]))
+fit_long <- tidyr::pivot_longer(fit_df, -time,
+                                names_to = "series", values_to = "incidence")
+ggplot(fit_long, aes(x = time, y = incidence, colour = series)) +
+  geom_line(data = filter(fit_long, series != "observed"), linewidth = 1) +
+  geom_point(data = filter(fit_long, series == "observed"), shape = 16) +
+  scale_colour_manual(values = c(observed = "black", true = "grey60",
+                                 fitted = "#D55E00")) +
+  labs(x = "Time (days)", y = "Weekly new infections", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 A few practical notes before moving to harder problems:
@@ -197,9 +217,12 @@ obs_step <- rpois(length(inc_step), inc_step)
 
 ```{r}
 #| fig-cap: "Weekly incidence when transmission halves at day 40 (dashed line)"
-plot(week_times[-1], obs_step, pch = 16,
-     xlab = "Time (days)", ylab = "Weekly new infections")
-abline(v = 40, lty = 2)
+step_df <- data.frame(time = week_times[-1], observed = obs_step)
+ggplot(step_df, aes(x = time, y = observed)) +
+  geom_point(shape = 16) +
+  geom_vline(xintercept = 40, linetype = "dashed") +
+  labs(x = "Time (days)", y = "Weekly new infections") +
+  theme_classic(base_size = 16)
 ```
 
 We fit three parameters: the two levels and the change time. The error
@@ -250,10 +273,14 @@ within a reporting interval or so.
 out_fitstep <- sir_step$new(
   beta_times = c(0, fit_step$par[3], 150),
   beta_vals = c(fit_step$par[1], fit_step$par[2], fit_step$par[2]))$run(week_times)
-plot(week_times[-1], obs_step, pch = 16,
-     xlab = "Time (days)", ylab = "Weekly new infections")
-lines(week_times[-1], diff(out_fitstep[, "cum_inc"]), col = "firebrick", lwd = 2)
-abline(v = fit_step$par[3], lty = 2)
+fitstep_df <- data.frame(time = week_times[-1], observed = obs_step,
+                         fitted = diff(out_fitstep[, "cum_inc"]))
+ggplot(fitstep_df, aes(x = time)) +
+  geom_point(aes(y = observed), shape = 16) +
+  geom_line(aes(y = fitted), colour = "#D55E00", linewidth = 1) +
+  geom_vline(xintercept = fit_step$par[3], linetype = "dashed") +
+  labs(x = "Time (days)", y = "Weekly new infections") +
+  theme_classic(base_size = 16)
 ```
 
 One caveat on identifiability: the change time is only learnable if the
@@ -310,8 +337,11 @@ obs_seas <- rpois(length(times_seas) - 1, diff(out_seas[, "cum_inc"]))
 
 ```{r}
 #| fig-cap: "Two years of noisy weekly incidence under seasonal forcing"
-plot(times_seas[-1], obs_seas, pch = 16, cex = 0.6,
-     xlab = "Time (days)", ylab = "Weekly new infections")
+seas_df <- data.frame(time = times_seas[-1], observed = obs_seas)
+ggplot(seas_df, aes(x = time, y = observed)) +
+  geom_point(shape = 16, size = 1) +
+  labs(x = "Time (days)", y = "Weekly new infections") +
+  theme_classic(base_size = 16)
 ```
 
 The error function constructs the seasonal beta(t) from three
@@ -362,9 +392,13 @@ bb_fit <- fit_seas$par[1] *
   (1 + fit_seas$par[2] * cos(2 * pi * (beta_times - fit_seas$par[3]) / 365))
 out_fitseas <- sirs_seasonal$new(beta_times = beta_times,
                                  beta_vals = bb_fit)$run(times_seas)
-plot(times_seas[-1], obs_seas, pch = 16, cex = 0.6,
-     xlab = "Time (days)", ylab = "Weekly new infections")
-lines(times_seas[-1], diff(out_fitseas[, "cum_inc"]), col = "firebrick", lwd = 1.5)
+fitseas_df <- data.frame(time = times_seas[-1], observed = obs_seas,
+                         fitted = diff(out_fitseas[, "cum_inc"]))
+ggplot(fitseas_df, aes(x = time)) +
+  geom_point(aes(y = observed), shape = 16, size = 1) +
+  geom_line(aes(y = fitted), colour = "#D55E00", linewidth = 0.75) +
+  labs(x = "Time (days)", y = "Weekly new infections") +
+  theme_classic(base_size = 16)
 ```
 
 ## Covariate-driven beta
@@ -382,11 +416,19 @@ driver_times <- seq(0, 150, by = 7)
 dip <- 1 - 0.6 * exp(-((driver_times - 60)^2) / (2 * 20^2))  # dip at day 60
 driver <- dip / mean(dip)            # rescale to mean 1
 beta_vals <- 2e-4 * driver           # beta(t) = beta0 * driver(t)
-par(mfrow = c(1, 2))
-plot(driver_times, driver, type = "l", lwd = 2,
-     xlab = "Time (days)", ylab = "Mobility index")
-plot(driver_times, beta_vals, type = "l", lwd = 2, col = "firebrick",
-     xlab = "Time (days)", ylab = expression(beta(t)))
+driver_df <- data.frame(time = driver_times, driver = driver, beta = beta_vals)
+
+p1 <- ggplot(driver_df, aes(x = time, y = driver)) +
+  geom_line(linewidth = 1) +
+  labs(x = "Time (days)", y = "Mobility index") +
+  theme_classic(base_size = 16)
+
+p2 <- ggplot(driver_df, aes(x = time, y = beta)) +
+  geom_line(linewidth = 1, colour = "#D55E00") +
+  labs(x = "Time (days)", y = expression(beta(t))) +
+  theme_classic(base_size = 16)
+
+p1 | p2
 ```
 
 Passing `driver_times` and `beta_vals` to the model is all the
@@ -443,12 +485,23 @@ beta(t) lies on top of the true one:
 
 ```{r}
 #| fig-cap: "True beta(t) (solid) and the fitted scaling (dashed) — nearly identical"
-plot(driver_times, 3e-4 * driver, type = "l", lwd = 2,
-     xlab = "Time (days)", ylab = expression(beta(t)), ylim = c(0, 4e-4))
-lines(driver_times, fit_driver$minimum * driver, lwd = 2,
-      col = "firebrick", lty = 2)
-legend("topright", legend = c("true beta(t)", "fitted beta(t)"),
-       col = c("black", "firebrick"), lty = c(1, 2), lwd = 2, bty = "n")
+beta_df <- data.frame(time = driver_times,
+                      `true beta(t)` = 3e-4 * driver,
+                      `fitted beta(t)` = fit_driver$minimum * driver,
+                      check.names = FALSE)
+beta_long <- tidyr::pivot_longer(beta_df, -time,
+                                 names_to = "series", values_to = "beta")
+ggplot(beta_long, aes(x = time, y = beta, colour = series, linetype = series)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = c("true beta(t)" = "black",
+                                 "fitted beta(t)" = "#D55E00")) +
+  scale_linetype_manual(values = c("true beta(t)" = "solid",
+                                   "fitted beta(t)" = "dashed")) +
+  coord_cartesian(ylim = c(0, 4e-4)) +
+  labs(x = "Time (days)", y = expression(beta(t)),
+       colour = NULL, linetype = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 This pattern generalises directly:
@@ -481,10 +534,14 @@ fit_free$par   # truth is a flat 2e-4
 
 ```{r}
 #| fig-cap: "Six freely fitted betas (step line) around the true constant value (dashed) — the wiggle is overfitting"
-plot(knot_times, fit_free$par, type = "s", lwd = 2, ylim = c(0, 4e-4),
-     xlab = "Time (days)", ylab = expression(beta), xlim = c(0, 150))
-points(knot_times, fit_free$par, pch = 16)
-abline(h = 2e-4, col = "firebrick", lty = 2)
+free_df <- data.frame(time = knot_times, beta = fit_free$par)
+ggplot(free_df, aes(x = time, y = beta)) +
+  geom_step(linewidth = 1) +
+  geom_point(shape = 16) +
+  geom_hline(yintercept = 2e-4, colour = "#D55E00", linetype = "dashed") +
+  coord_cartesian(xlim = c(0, 150), ylim = c(0, 4e-4)) +
+  labs(x = "Time (days)", y = expression(beta)) +
+  theme_classic(base_size = 16)
 ```
 
 The fitted values range from 1.96e-4 to 2.19e-4: the truth is flat, but

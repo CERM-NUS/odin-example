@@ -49,6 +49,7 @@ $N$ — and $\beta$ therefore depends on the population you are modelling.
 
 ```{r}
 library(odin)
+library(tidyverse)
 ```
 
 An odin model has three ingredients: derivatives (`deriv()`), initial
@@ -115,16 +116,19 @@ head(out)
 ```
 
 `out` is a data frame with one column per compartment plus time `t`, and one
-row per requested time point. Plot it with base R:
+row per requested time point. Plot it with ggplot2:
 
 ```{r}
 #| fig-cap: "SIR epidemic curve: R0 = beta * N / gamma = 2"
-matplot(out[, "t"], out[, c("S", "I", "R")],
-        type = "l", lty = 1, lwd = 2,
-        col = c("steelblue", "firebrick", "darkgreen"),
-        xlab = "Time (days)", ylab = "Number of people")
-legend("right", legend = c("S", "I", "R"), lwd = 2,
-       col = c("steelblue", "firebrick", "darkgreen"), bty = "n")
+as.data.frame(out) |>
+  pivot_longer(c(S, I, R), names_to = "compartment", values_to = "n") |>
+  mutate(compartment = factor(compartment, levels = c("S", "I", "R"))) |>
+  ggplot(aes(t, n, colour = compartment)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = c(S = "#0072B2", I = "#D55E00", R = "#009E73")) +
+  labs(x = "Time (days)", y = "Number of people", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 ## Making parameters changeable: `user()`
@@ -167,16 +171,21 @@ Scenarios are now cheap — pass new parameter values to `$new()`:
 #| fig-cap: "Peak prevalence falls as transmission slows"
 beta_values <- c(3e-4, 2e-4, 1.5e-4)
 
-plot(NULL, xlim = range(times), ylim = c(0, 350),
-     xlab = "Time (days)", ylab = "Infectious (I)")
-for (beta_i in beta_values) {          # one run per beta value
+scenario_labels <- paste("beta =", beta_values,
+                         "(R0 =", beta_values * 1000 / 0.1, ")")
+
+map_dfr(beta_values, function(beta_i) {    # one run per beta value
   mod <- sir_generator$new(beta = beta_i)
-  lines(times, mod$run(times)[, "I"], lwd = 2,
-        col = hcl.colors(length(beta_values), "Berlin")[which(beta_values == beta_i)])
-}
-legend("topright", legend = paste("beta =", beta_values,
-                                  "(R0 =", beta_values * 1000 / 0.1, ")"),
-       col = hcl.colors(length(beta_values), "Berlin"), lwd = 2, bty = "n")
+  data.frame(t = times, I = mod$run(times)[, "I"], beta = beta_i)
+}) |>
+  mutate(beta = factor(beta, levels = beta_values, labels = scenario_labels)) |>
+  ggplot(aes(t, I, colour = beta)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = hcl.colors(length(beta_values), "Berlin")) +
+  coord_cartesian(ylim = c(0, 350)) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Compilation happens once; every scenario after that is just `$new()` and
@@ -211,8 +220,11 @@ out <- sir_inc$new()$run(times)
 
 ```{r}
 #| fig-cap: "Cumulative incidence approaches the final epidemic size"
-plot(out[, "t"], out[, "cum_inc"], type = "l", lwd = 2,
-     xlab = "Time (days)", ylab = "Cumulative infections")
+as.data.frame(out) |>
+  ggplot(aes(t, cum_inc)) +
+  geom_line(linewidth = 1) +
+  labs(x = "Time (days)", y = "Cumulative infections") +
+  theme_classic(base_size = 16)
 ```
 
 The final value of `cum_inc` (≈ `r round(tail(out[, "cum_inc"], 1))` out of
@@ -232,16 +244,20 @@ as $R_0$ increases?
 #| code-fold: true
 #| code-summary: "Show solution"
 R0_targets <- c(1.2, 1.5, 2.5)
-cols <- hcl.colors(length(R0_targets), "Plasma")
-plot(NULL, xlim = range(times), ylim = c(0, 250),
-     xlab = "Time (days)", ylab = "Infectious (I)")
-for (i in seq_along(R0_targets)) {
-  beta_i <- R0_targets[i] * 0.1 / 1000     # R0 = beta * N / gamma
-  lines(times, sir_generator$new(beta = beta_i)$run(times)[, "I"],
-        col = cols[i], lwd = 2)
-}
-legend("topright", legend = paste("R0 =", R0_targets),
-       col = cols, lwd = 2, bty = "n")
+
+map_dfr(R0_targets, function(R0_i) {
+  beta_i <- R0_i * 0.1 / 1000     # R0 = beta * N / gamma
+  data.frame(t = times, I = sir_generator$new(beta = beta_i)$run(times)[, "I"],
+             R0 = R0_i)
+}) |>
+  mutate(R0 = factor(paste("R0 =", R0), levels = paste("R0 =", R0_targets))) |>
+  ggplot(aes(t, I, colour = R0)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = hcl.colors(length(R0_targets), "Plasma")) +
+  coord_cartesian(ylim = c(0, 250)) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Higher $R_0$ gives an earlier, higher, sharper peak; close to the threshold
@@ -258,9 +274,15 @@ What happens, and why does no epidemic occur?
 #| code-fold: true
 #| code-summary: "Show solution"
 out <- sir_generator$new(beta = 8e-5)$run(times)
-matplot(out[, "t"], out[, c("S", "I", "R")], type = "l", lty = 1, lwd = 2,
-        col = c("steelblue", "firebrick", "darkgreen"),
-        xlab = "Time (days)", ylab = "Number of people")
+as.data.frame(out) |>
+  pivot_longer(c(S, I, R), names_to = "compartment", values_to = "n") |>
+  mutate(compartment = factor(compartment, levels = c("S", "I", "R"))) |>
+  ggplot(aes(t, n, colour = compartment)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = c(S = "#0072B2", I = "#D55E00", R = "#009E73")) +
+  labs(x = "Time (days)", y = "Number of people", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 When $R_0 < 1$ each infectious person infects fewer than one other on

@@ -5,7 +5,6 @@ format:
     theme:
       - default
       - ../theme/slides.scss
-    smaller: true
     slide-number: true
     embed-resources: true
 echo: true
@@ -24,6 +23,7 @@ Swapnil Mishra (Asst. Professor)
 ```{r}
 #| include: false
 library(odin)
+library(tidyverse)
 times <- seq(0, 150, by = 1)   # daily output over 150 days
 ```
 
@@ -79,12 +79,16 @@ seir_generator <- odin::odin({
 ```{r}
 #| fig-height: 5.2
 out_seir <- seir_generator$new()$run(times)
-matplot(out_seir[, "t"], out_seir[, c("S", "E", "I", "R")],
-        type = "l", lty = 1, lwd = 2,
-        col = c("steelblue", "orange", "firebrick", "darkgreen"),
-        xlab = "Time (days)", ylab = "Number of people")
-legend("right", legend = c("S", "E", "I", "R"), lwd = 2, bty = "n",
-       col = c("steelblue", "orange", "firebrick", "darkgreen"))
+as.data.frame(out_seir) |>
+  pivot_longer(cols = c(S, E, I, R),
+               names_to = "compartment", values_to = "n") |>
+  ggplot(aes(x = t, y = n, colour = compartment)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(values = c(S = "#0072B2", E = "#E69F00",
+                                 I = "#D55E00", R = "#009E73")) +
+  labs(x = "Time (days)", y = "Number of people", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 ## SEIR vs SIR
@@ -113,11 +117,18 @@ out_sir <- sir_generator$new()$run(times)   # plain SIR for comparison
 
 ```{r}
 #| fig-height: 5.2
-plot(times, out_sir[, "I"], type = "l", lwd = 2, col = "grey60",
-     xlab = "Time (days)", ylab = "Infectious (I)")
-lines(times, out_seir[, "I"], lwd = 2, col = "firebrick")
-legend("topright", legend = c("SIR", "SEIR (4-day latent period)"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+bind_rows(
+  tibble(t = times, I = out_sir[, "I"],  model = "SIR"),
+  tibble(t = times, I = out_seir[, "I"], model = "SEIR (4-day latent period)")
+) |>
+  ggplot(aes(x = t, y = I, colour = model)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(limits = c("SIR", "SEIR (4-day latent period)"),
+                      values = c("SIR" = "grey60",
+                                 "SEIR (4-day latent period)" = "#D55E00")) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Same total transmission, spread over a longer time: later, lower peak.
@@ -166,9 +177,12 @@ seir_demo <- odin::odin({
 #| fig-height: 5.2
 times_long <- seq(0, 365 * 20, by = 7)   # 20 years, weekly output
 out_demo <- seir_demo$new()$run(times_long)
-plot(out_demo[, "t"] / 365, out_demo[, "I"], type = "l", lwd = 2,
-     col = "firebrick", xlab = "Time (years)", ylab = "Infectious (I)",
-     xlim = c(0, 10))
+tibble(t = out_demo[, "t"] / 365, I = out_demo[, "I"]) |>
+  ggplot(aes(x = t, y = I)) +
+  geom_line(linewidth = 1, colour = "#D55E00") +
+  coord_cartesian(xlim = c(0, 10)) +
+  labs(x = "Time (years)", y = "Infectious (I)") +
+  theme_classic(base_size = 16)
 ```
 
 Instead of dying out after one wave, incidence oscillates with shrinking
@@ -221,8 +235,12 @@ sir_step <- odin::odin({
 ## two regimes: beta halves at day 40
 beta_times <- c(0, 40, 150)
 beta_vals  <- c(2e-4, 1e-4, 1e-4)
-plot(beta_times, beta_vals, type = "s", lwd = 2, xlab = "Time (days)",
-     ylab = expression(beta), xlim = range(times))
+tibble(t = beta_times, beta = beta_vals) |>
+  ggplot(aes(x = t, y = beta)) +
+  geom_step(linewidth = 1) +
+  coord_cartesian(xlim = range(times)) +
+  labs(x = "Time (days)", y = expression(beta)) +
+  theme_classic(base_size = 16)
 ```
 
 Always plot what you are feeding in, before running.
@@ -234,12 +252,19 @@ Always plot what you are feeding in, before running.
 out_step   <- sir_step$new(beta_times = beta_times,
                            beta_vals = beta_vals)$run(times)
 out_nostep <- sir_generator$new()$run(times)   # baseline: constant beta
-plot(times, out_nostep[, "I"], type = "l", lwd = 2, col = "grey60",
-     xlab = "Time (days)", ylab = "Infectious (I)")
-lines(times, out_step[, "I"], lwd = 2, col = "firebrick")
-abline(v = 40, lty = 2)
-legend("topright", legend = c("constant beta", "beta halves at day 40"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+bind_rows(
+  tibble(t = times, I = out_nostep[, "I"], scenario = "constant beta"),
+  tibble(t = times, I = out_step[, "I"],   scenario = "beta halves at day 40")
+) |>
+  ggplot(aes(x = t, y = I, colour = scenario)) +
+  geom_line(linewidth = 1) +
+  geom_vline(xintercept = 40, linetype = "dashed") +
+  scale_colour_manual(limits = c("constant beta", "beta halves at day 40"),
+                      values = c("constant beta" = "grey60",
+                                 "beta halves at day 40" = "#D55E00")) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 One compiled model; the time series is just another parameter at `$new()`.
@@ -287,8 +312,12 @@ Always plot the series you feed into a model, before running anything.
 
 ```{r}
 #| fig-height: 4.5
-plot(beta_times / 365, beta_vals, type = "b", pch = 16, cex = 0.5,
-     xlab = "Time (years)", ylab = expression(beta))
+tibble(t = beta_times / 365, beta = beta_vals) |>
+  ggplot(aes(x = t, y = beta)) +
+  geom_line() +
+  geom_point(shape = 16, size = 0.8) +
+  labs(x = "Time (years)", y = expression(beta)) +
+  theme_classic(base_size = 16)
 ```
 
 ## Seasonal waves
@@ -303,8 +332,11 @@ out_seas <- mod$run(times_seas)
 
 ```{r}
 #| fig-height: 4.8
-plot(times_seas / 365, out_seas[, "I"], type = "l", lwd = 1.5,
-     col = "firebrick", xlab = "Time (years)", ylab = "Infectious (I)")
+tibble(t = times_seas / 365, I = out_seas[, "I"]) |>
+  ggplot(aes(x = t, y = I)) +
+  geom_line(linewidth = 0.75, colour = "#D55E00") +
+  labs(x = "Time (years)", y = "Infectious (I)") +
+  theme_classic(base_size = 16)
 ```
 
 After the first (largest) wave, incidence settles into annual waves that
@@ -341,17 +373,32 @@ beta_constant <- approx(knot_times, knot_vals, xout = days, method = "constant")
 #| fig-width: 9
 #| fig-height: 5.5
 #| out-width: 95%
-par(mar = c(4.5, 5, 2.5, 1) + 0.1)
-plot(days, beta_spline, type = "l", lwd = 3,
-     col = "#08519c", xlab = "Time (days)", ylab = expression(beta),
-     cex.axis = 1.2, cex.lab = 1.3)
-lines(days, beta_linear, lwd = 3, col = "#d7301f", lty = 2)
-lines(days, beta_constant, lwd = 2.5, col = "grey30")
-points(knot_times, knot_vals, pch = 16, cex = 1.6)
-legend("top", legend = c("spline", "linear", "constant", "knots"),
-       col = c("#08519c", "#d7301f", "grey30", "black"),
-       lwd = c(3, 3, 2.5, NA), lty = c(1, 2, 1, NA),
-       pch = c(NA, NA, NA, 16), bty = "n", horiz = TRUE, cex = 1.1)
+curves <- tibble(
+  t = days,
+  spline = beta_spline,
+  linear = beta_linear,
+  constant = beta_constant
+) |>
+  pivot_longer(cols = c(spline, linear, constant),
+               names_to = "type", values_to = "beta")
+
+ggplot() +
+  geom_line(data = curves,
+            aes(x = t, y = beta, colour = type, linetype = type),
+            linewidth = 1.2) +
+  geom_point(data = tibble(t = knot_times, beta = knot_vals),
+             aes(x = t, y = beta, colour = "knots"),
+             shape = 16, size = 2.5) +
+  scale_colour_manual(limits = c("spline", "linear", "constant", "knots"),
+                      values = c(spline = "#0072B2", linear = "#D55E00",
+                                 constant = "#009E73", knots = "black")) +
+  scale_linetype_manual(limits = c("spline", "linear", "constant"),
+                        values = c(spline = "solid", linear = "dashed",
+                                   constant = "solid")) +
+  labs(x = "Time (days)", y = expression(beta),
+       colour = NULL, linetype = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 ## Exercise 2.1 — A less variable latent period

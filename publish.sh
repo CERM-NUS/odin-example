@@ -1,8 +1,10 @@
 #!/bin/sh
 # Publish the session materials to GitHub Pages
 # (https://cerm-nus.github.io/odin-example/):
-# renders the slides and book, bundles the decks into the book site, and
-# force-pushes the result to the gh-pages branch of CERM-NUS/odin-example.
+# renders the slides (B3_1, B3_2 decks) and the book (which includes the
+# intervention chapters as book-only pages), bundles the decks into the
+# book site, and force-pushes the result to the gh-pages branch of
+# CERM-NUS/odin-example.
 #
 # Uses the PAT stored in ~/.cerm-nus-odin-pat for git pushes (so the
 # GH_TOKEN in your shell is untouched).
@@ -15,7 +17,7 @@ TOKEN_FILE="$HOME/.cerm-nus-odin-pat"
 TOKEN=$(tr -d '[:space:]' < "$TOKEN_FILE")
 AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64)"
 
-quarto render slides          # self-contained HTML decks
+quarto render slides          # self-contained HTML decks (B3_1, B3_2)
 quarto render                 # book; slides/*.html copied in via 'resources'
 
 TMP=$(mktemp -d)

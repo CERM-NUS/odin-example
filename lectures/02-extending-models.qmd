@@ -6,6 +6,7 @@ dynamics and parameters that change over time.
 ```{r}
 #| include: false
 library(odin)
+library(tidyverse)
 times <- seq(0, 150, by = 1)   # daily output over 150 days
 ```
 
@@ -48,12 +49,16 @@ out_seir <- seir_generator$new()$run(times)   # run with default parameters
 
 ```{r}
 #| fig-cap: "SEIR epidemic with a 4-day latent period"
-matplot(out_seir[, "t"], out_seir[, c("S", "E", "I", "R")],
-        type = "l", lty = 1, lwd = 2,
-        col = c("steelblue", "orange", "firebrick", "darkgreen"),
-        xlab = "Time (days)", ylab = "Number of people")
-legend("right", legend = c("S", "E", "I", "R"), lwd = 2, bty = "n",
-       col = c("steelblue", "orange", "firebrick", "darkgreen"))
+as.data.frame(out_seir) |>
+  pivot_longer(-t, names_to = "compartment", values_to = "n") |>
+  mutate(compartment = factor(compartment, levels = c("S", "E", "I", "R"))) |>
+  ggplot(aes(t, n, colour = compartment)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(
+    values = c(S = "#0072B2", E = "#E69F00", I = "#D55E00", R = "#009E73")) +
+  labs(x = "Time (days)", y = "Number of people", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Compared with the SIR from lecture 1, the same $R_0 = \beta N / \gamma$ now
@@ -79,11 +84,18 @@ sir_generator <- odin::odin({
 
 out_sir <- sir_generator$new()$run(times)   # plain SIR for comparison
 
-plot(times, out_sir[, "I"], type = "l", lwd = 2, col = "grey60",
-     xlab = "Time (days)", ylab = "Infectious (I)")
-lines(times, out_seir[, "I"], lwd = 2, col = "firebrick")
-legend("topright", legend = c("SIR", "SEIR (4-day latent period)"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+tibble(t = times,
+       SIR  = out_sir[, "I"],
+       `SEIR (4-day latent period)` = out_seir[, "I"]) |>
+  pivot_longer(-t, names_to = "model", values_to = "I") |>
+  mutate(model = factor(model, levels = c("SIR", "SEIR (4-day latent period)"))) |>
+  ggplot(aes(t, I, colour = model)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(
+    values = c("SIR" = "grey60", "SEIR (4-day latent period)" = "#D55E00")) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 The peak arrives later and is lower — the same total transmission, spread
@@ -130,9 +142,11 @@ out_demo <- seir_demo$new()$run(times_long)
 
 ```{r}
 #| fig-cap: "With births, the infection persists: damped oscillations towards an endemic equilibrium (first 10 years shown)"
-plot(out_demo[, "t"] / 365, out_demo[, "I"], type = "l", lwd = 2,
-     col = "firebrick", xlab = "Time (years)", ylab = "Infectious (I)",
-     xlim = c(0, 10))
+ggplot(as.data.frame(out_demo), aes(t / 365, I)) +
+  geom_line(colour = "#D55E00", linewidth = 1) +
+  coord_cartesian(xlim = c(0, 10)) +
+  labs(x = "Time (years)", y = "Infectious (I)") +
+  theme_classic(base_size = 16)
 ```
 
 Instead of dying out after one wave, incidence oscillates with shrinking
@@ -195,18 +209,29 @@ forcing first — always check what you are feeding in:
 
 ```{r}
 #| fig-cap: "beta as a step function of time"
-plot(beta_times, beta_vals, type = "s", lwd = 2, xlab = "Time (days)",
-     ylab = expression(beta), xlim = range(times))
+ggplot(tibble(t = beta_times, beta = beta_vals), aes(t, beta)) +
+  geom_step(direction = "hv", linewidth = 1) +
+  coord_cartesian(xlim = range(times)) +
+  labs(x = "Time (days)", y = expression(beta)) +
+  theme_classic(base_size = 16)
 ```
 
 ```{r}
 #| fig-cap: "Halving transmission at day 40 bends the epidemic curve"
-plot(times, out_nostep[, "I"], type = "l", lwd = 2, col = "grey60",
-     xlab = "Time (days)", ylab = "Infectious (I)")
-lines(times, out_step[, "I"], lwd = 2, col = "firebrick")
-abline(v = 40, lty = 2)
-legend("topright", legend = c("constant beta", "beta halves at day 40"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+tibble(t = times,
+       `constant beta`         = out_nostep[, "I"],
+       `beta halves at day 40` = out_step[, "I"]) |>
+  pivot_longer(-t, names_to = "scenario", values_to = "I") |>
+  mutate(scenario = factor(scenario,
+                           levels = c("constant beta", "beta halves at day 40"))) |>
+  ggplot(aes(t, I, colour = scenario)) +
+  geom_line(linewidth = 1) +
+  geom_vline(xintercept = 40, linetype = "dashed") +
+  scale_colour_manual(
+    values = c("constant beta" = "grey60", "beta halves at day 40" = "#D55E00")) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Note the workflow is unchanged: one compiled model, and the time series is
@@ -258,8 +283,11 @@ beta_vals  <- 2e-4 * (1 + 0.3 * cos(2 * pi * beta_times / 365))
 
 ```{r}
 #| fig-cap: "The seasonal forcing series: monthly knots, linear interpolation in between"
-plot(beta_times / 365, beta_vals, type = "b", pch = 16, cex = 0.5,
-     xlab = "Time (years)", ylab = expression(beta))
+ggplot(tibble(t = beta_times / 365, beta = beta_vals), aes(t, beta)) +
+  geom_line() +
+  geom_point(shape = 16, size = 1) +
+  labs(x = "Time (years)", y = expression(beta)) +
+  theme_classic(base_size = 16)
 ```
 
 Then pass the vectors at `$new()`; odin infers their lengths:
@@ -272,8 +300,10 @@ out_seas <- mod$run(times_seas)
 
 ```{r}
 #| fig-cap: "Seasonal waves: incidence rises and falls with the forced beta"
-plot(times_seas / 365, out_seas[, "I"], type = "l", lwd = 1.5,
-     col = "firebrick", xlab = "Time (years)", ylab = "Infectious (I)")
+ggplot(as.data.frame(out_seas), aes(t / 365, I)) +
+  geom_line(colour = "#D55E00", linewidth = 0.8) +
+  labs(x = "Time (years)", y = "Infectious (I)") +
+  theme_classic(base_size = 16)
 ```
 
 After the first (largest) wave, incidence settles into annual waves that
@@ -295,19 +325,35 @@ knot_times <- seq(0, 365, by = 365 / 4)   # quarterly knots — wider apart on p
 knot_vals  <- 2e-4 * (1 + 0.3 * cos(2 * pi * knot_times / 365))
 days       <- seq(0, 365, by = 1)   # daily points to evaluate the curves on
 
-par(mar = c(4.5, 5, 2.5, 1) + 0.1)
-plot(days, spline(knot_times, knot_vals, xout = days)$y, type = "l", lwd = 3,
-     col = "#08519c", xlab = "Time (days)", ylab = expression(beta),
-     cex.axis = 1.2, cex.lab = 1.3)
-lines(days, approx(knot_times, knot_vals, xout = days, method = "linear")$y,
-      lwd = 3, col = "#d7301f", lty = 2)
-lines(days, approx(knot_times, knot_vals, xout = days, method = "constant")$y,
-      lwd = 2.5, col = "grey30")
-points(knot_times, knot_vals, pch = 16, cex = 1.6)
-legend("top", legend = c("spline", "linear", "constant", "knots"),
-       col = c("#08519c", "#d7301f", "grey30", "black"),
-       lwd = c(3, 3, 2.5, NA), lty = c(1, 2, 1, NA),
-       pch = c(NA, NA, NA, 16), bty = "n", horiz = TRUE, cex = 1.1)
+curves <- tibble(
+  day      = days,
+  spline   = spline(knot_times, knot_vals, xout = days)$y,
+  linear   = approx(knot_times, knot_vals, xout = days, method = "linear")$y,
+  constant = approx(knot_times, knot_vals, xout = days, method = "constant")$y
+) |>
+  pivot_longer(-day, names_to = "method", values_to = "beta") |>
+  mutate(method = factor(method, levels = c("spline", "linear", "constant")))
+
+knots <- tibble(day = knot_times, beta = knot_vals)
+
+ggplot(curves, aes(day, beta)) +
+  geom_line(aes(colour = method, linetype = method, linewidth = method)) +
+  geom_point(data = knots, aes(colour = "knots"), shape = 16, size = 2.5) +
+  scale_colour_manual(
+    values = c(spline = "#0072B2", linear = "#D55E00",
+               constant = "#009E73", knots = "black"),
+    breaks = c("spline", "linear", "constant", "knots")) +
+  scale_linetype_manual(
+    values = c(spline = "solid", linear = "dashed", constant = "solid"),
+    guide = "none") +
+  scale_linewidth_manual(
+    values = c(spline = 1.2, linear = 1.2, constant = 1), guide = "none") +
+  guides(colour = guide_legend(override.aes = list(
+    linetype = c("solid", "dashed", "solid", "blank"),
+    shape    = c(NA, NA, NA, 16)))) +
+  labs(x = "Time (days)", y = expression(beta), colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 With quarterly knots the difference is visible: `"linear"` is a triangle
@@ -373,11 +419,18 @@ seir2_generator <- odin::odin({
 out_single  <- seir_generator$new(sigma = 1 / 8)$run(times)
 out_chained <- seir2_generator$new()$run(times)
 
-plot(times, out_single[, "I"], type = "l", lwd = 2, col = "grey60",
-     xlab = "Time (days)", ylab = "Infectious (I)")
-lines(times, out_chained[, "I"], lwd = 2, col = "firebrick")
-legend("topright", legend = c("single E", "chained E1 -> E2"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+tibble(t = times,
+       `single E`         = out_single[, "I"],
+       `chained E1 -> E2` = out_chained[, "I"]) |>
+  pivot_longer(-t, names_to = "model", values_to = "I") |>
+  mutate(model = factor(model, levels = c("single E", "chained E1 -> E2"))) |>
+  ggplot(aes(t, I, colour = model)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(
+    values = c("single E" = "grey60", "chained E1 -> E2" = "#D55E00")) +
+  labs(x = "Time (days)", y = "Infectious (I)", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 The curves are very similar — same $R_0$, same final size — but the chained
@@ -394,14 +447,22 @@ distributions the models imply:
 #| code-summary: "Show solution"
 #| fig-cap: "Same 8-day mean latent period: exponential (single E) vs Erlang-2 (chained)"
 latent_days <- seq(0, 30, by = 0.1)   # latent periods to evaluate the density on
-plot(latent_days, dexp(latent_days, rate = 1 / 8), type = "l", lwd = 2,
-     col = "grey60", xlab = "Latent period (days)", ylab = "Density")
-lines(latent_days, dgamma(latent_days, shape = 2, rate = 2 / 8),
-      lwd = 2, col = "firebrick")
-legend("topright",
-       legend = c("single E: exponential, variance 64",
-                  "chained: Erlang-2, variance 32"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+tibble(day = latent_days,
+       `single E: exponential, variance 64` = dexp(latent_days, rate = 1 / 8),
+       `chained: Erlang-2, variance 32` =
+         dgamma(latent_days, shape = 2, rate = 2 / 8)) |>
+  pivot_longer(-day, names_to = "model", values_to = "density") |>
+  mutate(model = factor(model,
+                        levels = c("single E: exponential, variance 64",
+                                   "chained: Erlang-2, variance 32"))) |>
+  ggplot(aes(day, density, colour = model)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(
+    values = c("single E: exponential, variance 64" = "grey60",
+               "chained: Erlang-2, variance 32" = "#D55E00")) +
+  labs(x = "Latent period (days)", y = "Density", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 The grey exponential says the most likely latent period is near zero — many
@@ -461,11 +522,18 @@ First, the plot as many people would draw it by default:
 #| code-fold: true
 #| code-summary: "Show solution"
 #| fig-cap: "Default axis limits — a misleading picture"
-plot(out_nomort[, "t"] / 365, pop_nomort, type = "l", lwd = 2, col = "grey60",
-     xlab = "Time (years)", ylab = "Total population")
-lines(out_mort[, "t"] / 365, pop_mort, lwd = 2, col = "firebrick")
-legend("topleft", legend = c("delta = 0", "delta = 0.01"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+tibble(t = out_nomort[, "t"] / 365,
+       `delta = 0`    = pop_nomort,
+       `delta = 0.01` = pop_mort) |>
+  pivot_longer(-t, names_to = "scenario", values_to = "pop") |>
+  mutate(scenario = factor(scenario, levels = c("delta = 0", "delta = 0.01"))) |>
+  ggplot(aes(t, pop, colour = scenario)) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(
+    values = c("delta = 0" = "grey60", "delta = 0.01" = "#D55E00")) +
+  labs(x = "Time (years)", y = "Total population", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 R picks axis limits from the data range, so the y-axis starts around 725 —
@@ -476,12 +544,19 @@ looks like a collapse. Whenever you plot counts, start the axis at 0:
 #| code-fold: true
 #| code-summary: "Show solution"
 #| fig-cap: "Same data, y-axis from 0 — the honest picture"
-plot(out_nomort[, "t"] / 365, pop_nomort, type = "l", lwd = 2, col = "grey60",
-     xlab = "Time (years)", ylab = "Total population",
-     ylim = c(0, 1000))
-lines(out_mort[, "t"] / 365, pop_mort, lwd = 2, col = "firebrick")
-legend("bottomleft", legend = c("delta = 0", "delta = 0.01"),
-       col = c("grey60", "firebrick"), lwd = 2, bty = "n")
+tibble(t = out_nomort[, "t"] / 365,
+       `delta = 0`    = pop_nomort,
+       `delta = 0.01` = pop_mort) |>
+  pivot_longer(-t, names_to = "scenario", values_to = "pop") |>
+  mutate(scenario = factor(scenario, levels = c("delta = 0", "delta = 0.01"))) |>
+  ggplot(aes(t, pop, colour = scenario)) +
+  geom_line(linewidth = 1) +
+  coord_cartesian(ylim = c(0, 1000)) +
+  scale_colour_manual(
+    values = c("delta = 0" = "grey60", "delta = 0.01" = "#D55E00")) +
+  labs(x = "Time (years)", y = "Total population", colour = NULL) +
+  theme_classic(base_size = 16) +
+  theme(legend.position = "bottom")
 ```
 
 Disease-induced deaths accumulate in `D` and the living population declines;

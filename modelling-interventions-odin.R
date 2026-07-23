@@ -69,7 +69,7 @@ p_sir <- df_sir_out %>%
   geom_line(aes(y=S, color="S"), alpha = 0.95) +
   geom_line(aes(y=I, color="I"), alpha = 0.95) +
   geom_line(aes(y=R, color="R"), alpha = 0.95) +
-  scale_colour_discrete(limits = c("S", "I", "R")) +
+  scale_colour_manual(values = c("S" = "#0072B2", "I" = "#D55E00", "R" = "#009E73")) +
   xlab("Time") +
   ylab("Total number of Individuals\n") +
   labs(color="Compartment") +
@@ -171,7 +171,7 @@ p_seir <- df_seir_out %>%
   geom_line(aes(y=S, color="S"), alpha = 0.95) +
   geom_line(aes(y=I, color="I"), alpha = 0.95) +
   geom_line(aes(y=R, color="R"), alpha = 0.95) +
-  scale_colour_discrete(limits = c("S", "I", "R")) +
+  scale_colour_manual(values = c("S" = "#0072B2", "I" = "#D55E00", "R" = "#009E73")) +
   xlab("Time") +
   ylab("Total number of Individuals\n") +
   labs(color="Compartment") +
@@ -245,7 +245,7 @@ p_tv <- df_tv_out %>%
   geom_line(aes(y=I, color="I"), alpha = 0.95) +
   geom_line(aes(y=R, color="R"), alpha = 0.95) +
   geom_vline(xintercept = 80, linetype = "dashed", color = "grey", size = 1.5) +
-  scale_colour_discrete(limits = c("S", "I", "R")) +
+  scale_colour_manual(values = c("S" = "#0072B2", "I" = "#D55E00", "R" = "#009E73")) +
   xlab("Time") +
   ylab("Total number of Individuals\n") +
   labs(color="Compartment") +
